@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel rdf:about="https://www.bis.org"><title>BIS Working Papers</title><link>https://www.bis.org</link><description>BIS</description></channel>
+<item rdf:about="https://www.bis.org/publ/work1330.htm"><title>Passive investors and loan spreads</title>
+<link>https://www.bis.org/publ/work1330.htm</link>
+<description>We document that passive ownership lowers loan spreads.</description>
+<dc:creator>Konrad Adler</dc:creator><dc:date>2026-10-27T08:00:00Z</dc:date></item>
+<item rdf:about="https://www.bis.org/publ/work1331.htm"><title>FISCAL RULES AND SOVEREIGN SPREADS!</title>
+<link>https://www.bis.org/publ/work1331.htm</link>
+<description>Same paper as NBER one (duplicate title test).</description>
+<dc:date>2026-10-27T08:00:00Z</dc:date></item>
+</rdf:RDF>

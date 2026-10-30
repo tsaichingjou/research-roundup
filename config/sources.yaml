@@ -1,0 +1,109 @@
+# =============================================================================
+# The Research Roundup — source configuration
+# -----------------------------------------------------------------------------
+# Every publication source the agent monitors is declared here, so adding or
+# removing a source never requires touching Python code.
+#
+# Fields
+#   id        unique short key, stored with every paper
+#   name      human-readable name shown in the newsletter
+#   category  journal | central_bank | research_institution
+#   type      fetcher to use: rss | crossref
+#   url       feed URL (rss sources)
+#   issn      journal ISSN (crossref sources)
+#   lookback_days  crossref: override the global look-back window
+#   enabled   set to false to skip a source without deleting it
+#   notes     anything worth knowing about the source
+# =============================================================================
+
+settings:
+  request_timeout_seconds: 20
+  max_retries: 3
+  user_agent: "ResearchRoundupBot/0.1 (economic research monitoring; contact: tsaichingjouinuk@gmail.com)"
+  contact_email: tsaichingjouinuk@gmail.com   # sent to Crossref for its "polite pool"
+  lookback_days: 30                           # crossref: how far back each run looks
+  database_path: data/papers.db
+
+sources:
+  # --- Research institutions --------------------------------------------------
+  - id: nber
+    name: National Bureau of Economic Research (NBER)
+    category: research_institution
+    type: rss
+    url: https://www.nber.org/rss/new.xml
+    enabled: true
+    notes: All new NBER working papers; weekly batch, usually released on Mondays.
+
+  - id: bis
+    name: Bank for International Settlements (BIS)
+    category: research_institution
+    type: rss
+    url: https://www.bis.org/doclist/wppubls.rss
+    enabled: true
+    notes: BIS Working Papers series.
+
+  - id: imf
+    name: International Monetary Fund (IMF)
+    category: research_institution
+    type: crossref
+    issn: 1018-5941
+    enabled: true
+    notes: >
+      IMF Working Papers. The IMF RSS endpoint returns 404 and the publications
+      search page is JavaScript-rendered, so papers are read from Crossref by
+      the series ISSN instead.
+
+  # --- Top-5 economics journals (Crossref, by print ISSN) ---------------------
+  # Journals register DOIs in batches every 1-2 months (e.g. Econometrica's
+  # latest batch was registered 14 Sep 2026), so they look back 90 days instead
+  # of 30. Already-stored papers are skipped by the de-duplication step.
+  - id: aer
+    name: American Economic Review
+    category: journal
+    type: crossref
+    issn: 0002-8282
+    lookback_days: 90
+    enabled: true
+
+  - id: ecta
+    name: Econometrica
+    category: journal
+    type: crossref
+    issn: 0012-9682
+    lookback_days: 90
+    enabled: true
+
+  - id: jpe
+    name: Journal of Political Economy
+    category: journal
+    type: crossref
+    issn: 0022-3808
+    lookback_days: 90
+    enabled: true
+
+  - id: qje
+    name: Quarterly Journal of Economics
+    category: journal
+    type: crossref
+    issn: 0033-5533
+    lookback_days: 90
+    enabled: true
+
+  - id: restud
+    name: Review of Economic Studies
+    category: journal
+    type: crossref
+    issn: 0034-6527
+    lookback_days: 90
+    enabled: true
+
+  # --- Planned (step 4) -------------------------------------------------------
+  - id: bis_research_hub
+    name: BIS Central Bank Research Hub
+    category: central_bank
+    type: rss
+    url: https://www.bis.org/doclist/reshub_papers.rss
+    enabled: false
+    notes: >
+      Aggregates new research papers from central banks worldwide. Candidate
+      shortcut for covering many G10 / European central banks with one feed.
