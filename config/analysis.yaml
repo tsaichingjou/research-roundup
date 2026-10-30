@@ -1,0 +1,44 @@
+# =============================================================================
+# The Research Roundup — analysis configuration
+# -----------------------------------------------------------------------------
+# Everything that shapes paper selection and the LLM analysis is set here.
+# =============================================================================
+
+llm:
+  provider: gemini
+  # Tried in order: if a model is unavailable for this API key (404), the next
+  # one is used. Run `python main.py models` to list the models your key can use.
+  models:
+    - gemini-3.8-flash
+    - gemini-3.5-flash-lite
+    - gemini-2.5-flash
+  temperature: 0.2
+  min_interval_seconds: 4     # spacing between calls, to stay inside free-tier RPM limits
+
+window:
+  days: 31                    # an issue covers papers first seen or published in the last N days
+
+prefilter:
+  min_abstract_chars: 200     # papers without a usable abstract are excluded (and logged)
+  exclude_title_patterns:     # non-research items
+    - "^comment on"
+    - "^reply to"
+    - "^a reply"
+    - "^rejoinder"
+    - "^erratum"
+    - "^corrigendum"
+    - "^correction"
+    - "^retraction"
+    - "^report of the"
+    - "^in memoriam"
+    - "^obituary"
+
+screening:
+  batch_size: 12              # papers per screening call
+  max_abstract_chars: 1500    # abstracts are truncated to this length when screening
+
+selection:
+  min_papers: 5
+  max_papers: 8
+  min_score: 6                # out of 10
+  max_per_source: 2           # keeps each issue diverse across institutions/journals
