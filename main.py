@@ -7,6 +7,7 @@ Usage
     python main.py models                 # list Gemini models available to your API key
     python main.py check                  # test each configured model and its response time
     python main.py analyse                # screen, select and analyse this month's papers
+    python main.py analyse --rewrite      # regenerate the write-ups (e.g. after a prompt change)
 """
 
 from __future__ import annotations
@@ -69,7 +70,9 @@ def main() -> int:
 
     sub.add_parser("models", help="List Gemini models available to your API key")
     sub.add_parser("check", help="Test each configured Gemini model")
-    sub.add_parser("analyse", aliases=["analyze"], help="Screen, select and analyse papers")
+    p_an = sub.add_parser("analyse", aliases=["analyze"], help="Screen, select and analyse papers")
+    p_an.add_argument("--rewrite", action="store_true",
+                      help="Regenerate the write-ups of the selected papers")
 
     args = parser.parse_args()
     load_dotenv(ROOT / ".env")
@@ -103,7 +106,8 @@ def main() -> int:
                         print(f"  {'OK  ' if ok else 'FAIL'} {model:<28} {secs:5.1f}s  {msg}")
                 return 0
             writer = make_client(acfg, "analysis")
-            report = run_analysis(storage, client, acfg, analysis_client=writer)
+            report = run_analysis(storage, client, acfg, analysis_client=writer,
+                                  rewrite=getattr(args, "rewrite", False))
         except LLMError as exc:
             print(f"\nERROR: {exc}")
             return 1

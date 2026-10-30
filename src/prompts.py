@@ -11,7 +11,12 @@ to economists, rates/FX/credit strategists, and sales & trading colleagues.
 
 You are rigorous and concise. You never invent findings, numbers, countries or methods \
 that are not stated in the title or abstract you are given. If the abstract is vague, \
-say less rather than guess."""
+say less rather than guess.
+
+House style: measured and factual, like a bank research note. Avoid promotional \
+intensifiers such as "vital", "crucial", "critical", "highly relevant", "groundbreaking" \
+or "must-read"; let the content show why a paper matters. Do not claim a paper is useful \
+to a specific trading desk unless the link is direct."""
 
 MARKET_FOCUS_GUIDE = """Market-focus classification (exactly one label):
 - "EM"  (Emerging Markets): the paper's data, setting or conclusions are primarily about \
@@ -24,7 +29,8 @@ Nordics. A study using only US data is DM even if the mechanism is general.
 - "Transversal": relevant across both groups, or not specific to either — cross-country \
 panels mixing advanced and emerging economies, global phenomena (global financial cycle, \
 commodity prices, world trade), or theory/methods papers with no particular geography.
-Judge by where the evidence and conclusions apply, not by the authors' institution."""
+Judge by where the evidence and conclusions apply, not by the authors' institution.
+Base the label only on countries, regions or data the title/abstract actually names. Do not infer geography from the type of model (e.g. "New Keynesian models are used for advanced economies") or from the policy debate the paper might feed into: a theory paper that names no country is "Transversal"; it is "DM" or "EM" only if the abstract applies or calibrates it to specific economies of that group."""
 
 RELEVANCE_GUIDE = """Market relevance score (0-10) for a markets research audience:
 - 9-10: directly informs views on monetary policy, inflation, rates, FX, sovereign or \

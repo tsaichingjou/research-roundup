@@ -50,7 +50,9 @@ python main.py fetch                 # fetch all enabled sources
 python main.py fetch --only nber     # fetch one source
 python main.py show --limit 10       # list the latest stored papers
 python main.py models                # list Gemini models your key can use
+python main.py check                 # test each configured model and its response time
 python main.py analyse               # screen, select and analyse this month's papers
+python main.py analyse --rewrite     # regenerate write-ups (after a prompt change, or with a stronger model)
 python -m pytest -q                  # run tests (no network or API key needed)
 ```
 
@@ -66,7 +68,7 @@ python -m pytest -q                  # run tests (no network or API key needed)
 ## Analysis design
 
 **Two LLM stages.** A month brings 150–300 new papers. Every paper with an
-abstract is scored in batches of 12 (relevance 0–10, market focus, topic); only
+abstract is scored in batches of 8 (relevance 0–10, market focus, topic); only
 the 5–8 selected papers get the full write-up. This keeps a monthly run to
 roughly 20–30 LLM calls, inside the Gemini free tier.
 
@@ -84,7 +86,16 @@ the larger volume of DM research.
 
 **Classification.** Each selected paper is labelled **EM**, **DM** or
 **Transversal**, judged by where its evidence and conclusions apply (definitions
-in `src/prompts.py`), with a one- to two-sentence rationale.
+in `src/prompts.py`), with a one- to two-sentence rationale. The label must rest
+on countries or data the abstract actually names: a theory paper that names no
+economy is Transversal, rather than being inferred as DM from the type of model
+it uses (an error observed in the first test run and corrected in the prompt).
+
+**Models.** A fast "lite" model screens; a stronger model writes. Each list in
+`config/analysis.yaml` falls back automatically when a model is unavailable,
+overloaded (HTTP 5xx) or too slow — on the Gemini free tier the larger models
+are often overloaded at peak times. Each write-up records the model that
+produced it.
 
 **Reliability.** JSON-mode output is validated field by field; invalid answers
 are retried once, and papers the model skips are retried on the next run rather

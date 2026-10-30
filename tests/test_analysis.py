@@ -240,3 +240,12 @@ def test_gemini_client_falls_back_when_model_overloaded(monkeypatch):
     client = llm.GeminiClient(models=["busy-model", "ok-model"], api_key="k", min_interval_seconds=0)
     assert client.generate_json("hi") == {"ok": 1}
     assert client.model == "ok-model"
+
+
+def test_rewrite_regenerates_cached_analyses(tmp_path):
+    store = make_store(tmp_path, [(f"s{i}", f"Paper {i} [DM] score=8", ABSTRACT) for i in range(3)])
+    client = FakeClient()
+    analysis.run_analysis(store, client, CFG)
+    n = len(client.prompts)
+    analysis.run_analysis(store, client, CFG, rewrite=True)
+    assert len(client.prompts) == n + 3          # 3 write-ups regenerated, no re-screening

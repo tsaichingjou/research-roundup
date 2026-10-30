@@ -196,9 +196,12 @@ def analyse_paper(paper: dict, client: JSONModel) -> dict:
 
 # --- Orchestration ----------------------------------------------------------------
 def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
-                 now: datetime | None = None, analysis_client: JSONModel | None = None) -> dict:
+                 now: datetime | None = None, analysis_client: JSONModel | None = None,
+                 rewrite: bool = False) -> dict:
     """`client` screens; `analysis_client` (defaults to `client`) writes the full
-    analyses — a fast, cheap model is enough to score, a stronger one writes."""
+    analyses — a fast, cheap model is enough to score, a stronger one writes.
+    `rewrite=True` regenerates the write-ups of the selected papers (e.g. after a
+    prompt change, or when a stronger model is available again)."""
     now = now or datetime.now(timezone.utc)
     analysis_client = analysis_client or client
     since = (now - timedelta(days=cfg["window"]["days"])).isoformat()
@@ -223,7 +226,7 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
     # 4. deep analysis (cached)
     entries = []
     for p in selected:
-        analysis = storage.get_analysis(p["uid"])
+        analysis = None if rewrite else storage.get_analysis(p["uid"])
         if analysis is None:
             try:
                 analysis = analyse_paper(p, analysis_client)
