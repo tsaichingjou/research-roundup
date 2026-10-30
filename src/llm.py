@@ -31,6 +31,10 @@ class LLMError(Exception):
     pass
 
 
+class LLMAuthError(LLMError):
+    """The API key is missing, invalid or not allowed: retrying cannot help."""
+
+
 class JSONModel(Protocol):
     """Anything that can turn a prompt into parsed JSON (real client or test fake)."""
 
@@ -61,7 +65,7 @@ class GeminiClient:
                  max_retries: int = 5, timeout: int = 120):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
-            raise LLMError(
+            raise LLMAuthError(
                 "GEMINI_API_KEY is not set. Put it in a .env file in the project root "
                 "(see .env.example) or export it as an environment variable."
             )
@@ -149,6 +153,12 @@ class GeminiClient:
             ):
                 raise _ModelUnavailable(f"HTTP {resp.status_code}")
             if resp.status_code in (400, 401, 403):
+                if "api key" in resp.text.lower() or "api_key" in resp.text.lower() \
+                        or resp.status_code in (401, 403):
+                    raise LLMAuthError(
+                        f"Gemini rejected the API key (HTTP {resp.status_code}). Check that "
+                        "GEMINI_API_KEY in .env is your real key from "
+                        "https://aistudio.google.com/apikey")
                 raise LLMError(f"Gemini rejected the request (HTTP {resp.status_code}): "
                                f"{resp.text[:300]}")
             # 429 (rate limit) and 5xx: back off and retry

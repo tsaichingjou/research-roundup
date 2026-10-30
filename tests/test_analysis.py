@@ -180,3 +180,19 @@ def test_gemini_client_falls_back_on_404(monkeypatch):
     client = llm.GeminiClient(models=["old-model", "new-model"], api_key="k", min_interval_seconds=0)
     assert client.generate_json("hi") == {"ok": True}
     assert client.model == "new-model" and len(calls) == 2
+
+
+def test_invalid_key_stops_immediately(monkeypatch, tmp_path):
+    from src import llm
+
+    class Resp:
+        status_code, headers = 400, {}
+        text = '{"error": {"message": "API key not valid. Please pass a valid API key."}}'
+
+    calls = []
+    monkeypatch.setattr(llm.requests, "post", lambda *a, **k: calls.append(1) or Resp())
+    store = make_store(tmp_path, [("nber", f"Paper {i} [DM] score=7", ABSTRACT) for i in range(7)])
+    client = llm.GeminiClient(models=["m"], api_key="paste-your-key-here", min_interval_seconds=0)
+    with pytest.raises(llm.LLMAuthError):
+        analysis.run_analysis(store, client, CFG)
+    assert len(calls) == 1          # did not try the remaining batches

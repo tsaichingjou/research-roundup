@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 
 from src import prompts
-from src.llm import JSONModel, LLMError
+from src.llm import JSONModel, LLMAuthError, LLMError
 from src.storage import Storage
 
 log = logging.getLogger(__name__)
@@ -90,6 +90,8 @@ def screen(papers: list[dict], client: JSONModel, cfg: dict) -> list[dict]:
         ])
         try:
             response = client.generate_json(prompt, system=prompts.SYSTEM)
+        except LLMAuthError:
+            raise  # a bad key fails every batch: stop at once
         except LLMError as exc:
             log.error("Screening batch %d failed: %s", start // batch_size + 1, exc)
             continue
@@ -218,6 +220,8 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
         if analysis is None:
             try:
                 analysis = analyse_paper(p, client)
+            except LLMAuthError:
+                raise
             except LLMError as exc:
                 log.error("Skipping '%s': %s", p["title"][:60], exc)
                 continue
