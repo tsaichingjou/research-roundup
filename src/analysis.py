@@ -72,9 +72,10 @@ def _validate_screening(item: dict) -> dict | None:
     }
 
 
-def screen(papers: list[dict], client: JSONModel, cfg: dict) -> list[dict]:
+def screen(papers: list[dict], client: JSONModel, cfg: dict, on_batch=None) -> list[dict]:
     """Score papers in batches. Papers the model skips are left unscreened and
-    retried on the next run rather than guessed."""
+    retried on the next run rather than guessed. `on_batch(results)` is called
+    after every batch so progress is saved even if the run is interrupted."""
     batch_size = cfg["screening"]["batch_size"]
     max_chars = cfg["screening"]["max_abstract_chars"]
     results: list[dict] = []
@@ -98,13 +99,16 @@ def screen(papers: list[dict], client: JSONModel, cfg: dict) -> list[dict]:
         if isinstance(response, dict):  # some models wrap the array
             response = next((v for v in response.values() if isinstance(v, list)), [])
 
-        seen = set()
+        seen, batch_results = set(), []
         for item in response if isinstance(response, list) else []:
             uid = id_map.get(str(item.get("id", "")).strip())
             valid = _validate_screening(item) if uid else None
             if valid and uid not in seen:
                 seen.add(uid)
-                results.append({"uid": uid, "status": "scored", **valid})
+                batch_results.append({"uid": uid, "status": "scored", **valid})
+        results += batch_results
+        if on_batch:
+            on_batch(batch_results)
         missing = len(batch) - len(seen)
         if missing:
             log.warning("Screening batch %d: %d paper(s) not returned; will retry next run",
@@ -192,8 +196,11 @@ def analyse_paper(paper: dict, client: JSONModel) -> dict:
 
 # --- Orchestration ----------------------------------------------------------------
 def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
-                 now: datetime | None = None) -> dict:
+                 now: datetime | None = None, analysis_client: JSONModel | None = None) -> dict:
+    """`client` screens; `analysis_client` (defaults to `client`) writes the full
+    analyses — a fast, cheap model is enough to score, a stronger one writes."""
     now = now or datetime.now(timezone.utc)
+    analysis_client = analysis_client or client
     since = (now - timedelta(days=cfg["window"]["days"])).isoformat()
     candidates = storage.candidates(since)
     screened = storage.get_screening()
@@ -204,8 +211,8 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
     storage.save_screening(excluded, model=None)
 
     # 2. screen what is left
-    results = screen(kept, client, cfg)
-    storage.save_screening(results, model=getattr(client, "model", None))
+    screen(kept, client, cfg,
+           on_batch=lambda res: storage.save_screening(res, model=getattr(client, "model", None)))
     screened = storage.get_screening()
 
     # 3. select from everything scored in the window
@@ -219,13 +226,13 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
         analysis = storage.get_analysis(p["uid"])
         if analysis is None:
             try:
-                analysis = analyse_paper(p, client)
+                analysis = analyse_paper(p, analysis_client)
             except LLMAuthError:
                 raise
             except LLMError as exc:
                 log.error("Skipping '%s': %s", p["title"][:60], exc)
                 continue
-            storage.save_analysis(p["uid"], analysis, getattr(client, "model", None))
+            storage.save_analysis(p["uid"], analysis, getattr(analysis_client, "model", None))
         entries.append({"paper": p, "analysis": analysis})
 
     # coverage report: what was considered, and which sources needed fallbacks

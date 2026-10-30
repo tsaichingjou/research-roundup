@@ -5,6 +5,7 @@ Usage
     python main.py fetch --only nber bis  # fetch selected sources
     python main.py show --limit 10        # list the most recent stored papers
     python main.py models                 # list Gemini models available to your API key
+    python main.py check                  # test each configured model and its response time
     python main.py analyse                # screen, select and analyse this month's papers
 """
 
@@ -26,10 +27,11 @@ from src.pipeline import load_config, run_fetch  # noqa: E402
 from src.storage import Storage  # noqa: E402
 
 
-def make_client(acfg: dict) -> GeminiClient:
+def make_client(acfg: dict, stage: str) -> GeminiClient:
     llm = acfg["llm"]
-    return GeminiClient(models=llm["models"], temperature=llm.get("temperature", 0.2),
-                        min_interval_seconds=llm.get("min_interval_seconds", 4))
+    return GeminiClient(models=llm[f"{stage}_models"], temperature=llm.get("temperature", 0.2),
+                        min_interval_seconds=llm.get("min_interval_seconds", 4),
+                        timeout=llm.get("timeout_seconds", 90))
 
 
 def print_analysis(report: dict) -> None:
@@ -66,6 +68,7 @@ def main() -> int:
     p_show.add_argument("--limit", type=int, default=10)
 
     sub.add_parser("models", help="List Gemini models available to your API key")
+    sub.add_parser("check", help="Test each configured Gemini model")
     sub.add_parser("analyse", aliases=["analyze"], help="Screen, select and analyse papers")
 
     args = parser.parse_args()
@@ -85,21 +88,30 @@ def main() -> int:
         print(f"\nTotal papers in database: {storage.count()}")
         return 0 if any(r.ok for r in results) else 1
 
-    if args.command in ("models", "analyse", "analyze"):
+    if args.command in ("models", "check", "analyse", "analyze"):
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
         try:
-            client = make_client(acfg)
+            client = make_client(acfg, "screening")
             if args.command == "models":
                 print("\n".join(client.list_models()))
                 return 0
-            report = run_analysis(storage, client, acfg)
+            if args.command == "check":
+                for stage in ("screening", "analysis"):
+                    print(f"\n{stage} models:")
+                    for model in acfg["llm"][f"{stage}_models"]:
+                        ok, secs, msg = client.ping(model)
+                        print(f"  {'OK  ' if ok else 'FAIL'} {model:<28} {secs:5.1f}s  {msg}")
+                return 0
+            writer = make_client(acfg, "analysis")
+            report = run_analysis(storage, client, acfg, analysis_client=writer)
         except LLMError as exc:
             print(f"\nERROR: {exc}")
             return 1
         out = ROOT / "output" / "latest_analysis.json"
         out.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
         print_analysis(report)
-        print(f"\nLLM calls this run: {client.calls} (model: {client.model})")
+        print(f"\nLLM calls this run: {client.calls} screening ({client.model}), "
+              f"{writer.calls} analysis ({writer.model})")
         print(f"Full results saved to {out.relative_to(ROOT)}")
         return 0
 

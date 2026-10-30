@@ -6,14 +6,25 @@
 
 llm:
   provider: gemini
-  # Tried in order: if a model is unavailable for this API key (404), the next
-  # one is used. Run `python main.py models` to list the models your key can use.
-  models:
+  # Each list is tried in order: if a model is unavailable for this API key
+  # (404) or repeatedly times out, the next one is used.
+  #   python main.py models   -> models your key can use
+  #   python main.py check    -> test each configured model and its response time
+  # Screening is a simple scoring task: a fast "lite" model is enough.
+  screening_models:
+    - gemini-3.5-flash-lite
+    - gemini-3.1-flash-lite
+    - gemini-2.5-flash-lite
     - gemini-3.8-flash
+  # The newsletter write-ups use a stronger model.
+  analysis_models:
+    - gemini-3.8-flash
+    - gemini-3.6-flash
     - gemini-3.5-flash-lite
     - gemini-2.5-flash
   temperature: 0.2
   min_interval_seconds: 4     # spacing between calls, to stay inside free-tier RPM limits
+  timeout_seconds: 90         # a model that times out twice is skipped for the next one
 
 window:
   days: 31                    # an issue covers papers first seen or published in the last N days
@@ -34,7 +45,7 @@ prefilter:
     - "^obituary"
 
 screening:
-  batch_size: 12              # papers per screening call
+  batch_size: 8               # papers per screening call
   max_abstract_chars: 1500    # abstracts are truncated to this length when screening
 
 selection:

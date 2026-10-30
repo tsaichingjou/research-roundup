@@ -196,3 +196,29 @@ def test_invalid_key_stops_immediately(monkeypatch, tmp_path):
     with pytest.raises(llm.LLMAuthError):
         analysis.run_analysis(store, client, CFG)
     assert len(calls) == 1          # did not try the remaining batches
+
+
+def test_gemini_client_falls_back_after_repeated_timeouts(monkeypatch):
+    from src import llm
+
+    class Resp:
+        status_code, headers = 200, {}
+        text = ""
+
+        def json(self):
+            return {"candidates": [{"content": {"parts": [{"text": '[{"ok": 1}]'}]}}]}
+
+    calls = []
+
+    def fake_post(url, **kw):
+        calls.append(url)
+        if "slow-model" in url:
+            raise llm.requests.Timeout("slow")
+        return Resp()
+
+    monkeypatch.setattr(llm.requests, "post", fake_post)
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    client = llm.GeminiClient(models=["slow-model", "fast-model"], api_key="k", min_interval_seconds=0)
+    assert client.generate_json("hi") == [{"ok": 1}]
+    assert client.model == "fast-model"
+    assert sum("slow-model" in c for c in calls) == 2      # gave up after 2 timeouts

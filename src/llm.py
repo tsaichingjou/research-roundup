@@ -62,7 +62,7 @@ def parse_json(text: str) -> dict | list:
 class GeminiClient:
     def __init__(self, models: list[str], api_key: str | None = None,
                  temperature: float = 0.2, min_interval_seconds: float = 4.0,
-                 max_retries: int = 5, timeout: int = 120):
+                 max_retries: int = 4, timeout: int = 90, max_timeouts_per_model: int = 2):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
             raise LLMAuthError(
@@ -77,6 +77,7 @@ class GeminiClient:
         self.min_interval = min_interval_seconds
         self.max_retries = max_retries
         self.timeout = timeout
+        self.max_timeouts = max_timeouts_per_model
         self._last_call = 0.0
         self.calls = 0
 
@@ -103,6 +104,21 @@ class GeminiClient:
                 log.warning("Malformed JSON from %s (%s); retrying once", self.model, exc)
                 text = self._post(body)
                 return parse_json(text)
+
+    def ping(self, model: str) -> tuple[bool, float, str]:
+        """Send a tiny JSON request to one model. Returns (ok, seconds, message)."""
+        body = {"contents": [{"role": "user", "parts": [{"text": 'Return {"ok": true}'}]}],
+                "generationConfig": {"responseMimeType": "application/json"}}
+        start = time.monotonic()
+        try:
+            resp = requests.post(f"{API_ROOT}/models/{model}:generateContent",
+                                 headers=self._headers(), json=body, timeout=self.timeout)
+        except requests.RequestException as exc:
+            return False, time.monotonic() - start, type(exc).__name__
+        elapsed = time.monotonic() - start
+        if resp.status_code == 200:
+            return True, elapsed, "ok"
+        return False, elapsed, f"HTTP {resp.status_code}"
 
     def list_models(self) -> list[str]:
         resp = requests.get(f"{API_ROOT}/models", headers=self._headers(),
@@ -135,11 +151,20 @@ class GeminiClient:
 
     def _post(self, body: dict) -> str:
         url = f"{API_ROOT}/models/{self.model}:generateContent"
+        timeouts = 0
         for attempt in range(1, self.max_retries + 1):
             self._throttle()
             self.calls += 1
             try:
                 resp = requests.post(url, headers=self._headers(), json=body, timeout=self.timeout)
+            except requests.Timeout:
+                # A model that repeatedly takes longer than `timeout` is treated as
+                # unavailable (overloaded, or too slow on the free tier): fall back.
+                timeouts += 1
+                if timeouts >= self.max_timeouts:
+                    raise _ModelUnavailable(f"timed out {timeouts}x after {self.timeout}s")
+                self._sleep_backoff(attempt, f"timeout after {self.timeout}s")
+                continue
             except requests.RequestException as exc:
                 self._sleep_backoff(attempt, f"network error: {exc}")
                 continue
