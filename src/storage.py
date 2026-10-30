@@ -144,6 +144,15 @@ class Storage:
             ).fetchall()
         return [_paper_dict(r) for r in rows]
 
+    def all_papers(self) -> list[dict]:
+        with self._conn() as conn:
+            return [_paper_dict(r) for r in conn.execute("SELECT * FROM papers").fetchall()]
+
+    def all_analyses(self) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute("SELECT uid, market_focus, model FROM analysis").fetchall()
+        return [dict(r) for r in rows]
+
     def get_screening(self) -> dict[str, dict]:
         with self._conn() as conn:
             rows = conn.execute("SELECT * FROM screening").fetchall()

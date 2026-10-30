@@ -53,6 +53,9 @@ python main.py models                # list Gemini models your key can use
 python main.py check                 # test each configured model and its response time
 python main.py analyse               # screen, select and analyse this month's papers
 python main.py analyse --rewrite     # regenerate write-ups (after a prompt change, or with a stronger model)
+python main.py export-labels         # blind, stratified labelling sample -> evaluation/labels.csv
+python main.py evaluate              # compare LLM classification with the human labels
+python main.py evaluate --rerun      # same, re-classifying the sample with the current prompt
 python -m pytest -q                  # run tests (no network or API key needed)
 ```
 
@@ -102,6 +105,26 @@ are retried once, and papers the model skips are retried on the next run rather
 than guessed. All results are cached, so re-running costs no extra calls.
 The model never sees anything but the title, authors and abstract, and is
 instructed not to state findings that are not in them.
+
+## Evaluating the classification
+
+The EM / DM / Transversal labels are checked against human labels rather than
+taken on trust (`src/evaluation.py`):
+
+- **Blind, stratified sample.** `export-labels` draws ~15 papers per LLM class
+  (DM papers far outnumber EM ones, so a random sample would leave EM recall
+  resting on a handful of papers) and writes only titles and abstracts, so the
+  annotator is not anchored by the LLM's answer. Labelling rules:
+  `evaluation/LABELLING_GUIDE.md`.
+- **Dev / test split.** Errors on `dev` rows may be used to improve the prompt;
+  the reported score comes from `test` rows not looked at while tuning.
+- **Metrics.** Accuracy with a Wilson 95% interval, confusion matrix,
+  per-class precision / recall / F1, macro-F1 (robust to class imbalance) and
+  Cohen's κ (agreement beyond chance).
+- **Consistency without labels.** The screening model and the writing model
+  label each selected paper independently; their agreement rate is reported too.
+
+Results: see `evaluation/report.txt`.
 
 ## Roadmap
 

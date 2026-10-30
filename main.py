@@ -8,6 +8,8 @@ Usage
     python main.py check                  # test each configured model and its response time
     python main.py analyse                # screen, select and analyse this month's papers
     python main.py analyse --rewrite      # regenerate the write-ups (e.g. after a prompt change)
+    python main.py export-labels          # write a blind labelling sample to evaluation/labels.csv
+    python main.py evaluate [--rerun]     # compare LLM classification with your labels
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.analysis import load_analysis_config, run_analysis  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
+from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
 from src.llm import GeminiClient, LLMError  # noqa: E402
 from src.pipeline import load_config, run_fetch  # noqa: E402
 from src.storage import Storage  # noqa: E402
@@ -74,6 +77,13 @@ def main() -> int:
     p_an.add_argument("--rewrite", action="store_true",
                       help="Regenerate the write-ups of the selected papers")
 
+    p_ex = sub.add_parser("export-labels", help="Write a blind, stratified labelling sample")
+    p_ex.add_argument("--per-class", type=int, default=15)
+    p_ex.add_argument("--force", action="store_true", help="Overwrite an existing labels file")
+    p_ev = sub.add_parser("evaluate", help="Compare LLM classification with human labels")
+    p_ev.add_argument("--rerun", action="store_true",
+                      help="Re-classify the labelled papers now with the current prompt")
+
     args = parser.parse_args()
     load_dotenv(ROOT / ".env")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
@@ -90,6 +100,32 @@ def main() -> int:
             print(f"  {r.source_id:<10} {status}")
         print(f"\nTotal papers in database: {storage.count()}")
         return 0 if any(r.ok for r in results) else 1
+
+    labels_path = ROOT / "evaluation" / "labels.csv"
+    if args.command == "export-labels":
+        if labels_path.exists() and not args.force:
+            print(f"{labels_path.relative_to(ROOT)} already exists and may contain your labels. "
+                  "Use --force to overwrite it.")
+            return 1
+        counts = export_sample(storage, labels_path, per_class=args.per_class)
+        print(f"Wrote {sum(counts.values())} papers to {labels_path.relative_to(ROOT)} "
+              f"(stratified by LLM label: {dict(counts)})")
+        print("Fill the 'human_label' column with EM, DM or Transversal, then run: python main.py evaluate")
+        return 0
+
+    if args.command == "evaluate":
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        try:
+            client = make_client(acfg, "screening") if args.rerun else None
+            result = evaluate(storage, labels_path, client=client, cfg=acfg)
+        except (LLMError, ValueError, FileNotFoundError) as exc:
+            print(f"ERROR: {exc}")
+            return 1
+        report = format_report(result)
+        print(report)
+        (ROOT / "evaluation" / "report.txt").write_text(report + "\n", encoding="utf-8")
+        print("\nSaved to evaluation/report.txt")
+        return 0
 
     if args.command in ("models", "check", "analyse", "analyze"):
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
