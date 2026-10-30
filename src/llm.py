@@ -186,7 +186,13 @@ class GeminiClient:
                         "https://aistudio.google.com/apikey")
                 raise LLMError(f"Gemini rejected the request (HTTP {resp.status_code}): "
                                f"{resp.text[:300]}")
-            # 429 (rate limit) and 5xx: back off and retry
+            if resp.status_code in (500, 502, 503, 504):
+                # Overloaded or failing model: same treatment as timeouts — after
+                # two failures move to the next model rather than keep waiting.
+                timeouts += 1
+                if timeouts >= self.max_timeouts:
+                    raise _ModelUnavailable(f"HTTP {resp.status_code} {timeouts}x (overloaded)")
+            # 429 (rate limit) and transient 5xx: back off and retry
             self._sleep_backoff(attempt, f"HTTP {resp.status_code}", _retry_delay(resp))
         raise LLMError(f"Gemini call failed after {self.max_retries} attempts")
 

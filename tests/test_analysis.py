@@ -222,3 +222,21 @@ def test_gemini_client_falls_back_after_repeated_timeouts(monkeypatch):
     assert client.generate_json("hi") == [{"ok": 1}]
     assert client.model == "fast-model"
     assert sum("slow-model" in c for c in calls) == 2      # gave up after 2 timeouts
+
+
+def test_gemini_client_falls_back_when_model_overloaded(monkeypatch):
+    from src import llm
+
+    class Resp:
+        def __init__(self, code):
+            self.status_code, self.headers, self.text = code, {}, "overloaded"
+
+        def json(self):
+            return {"candidates": [{"content": {"parts": [{"text": '{"ok": 1}'}]}}]}
+
+    monkeypatch.setattr(llm.requests, "post",
+                        lambda url, **k: Resp(503 if "busy-model" in url else 200))
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    client = llm.GeminiClient(models=["busy-model", "ok-model"], api_key="k", min_interval_seconds=0)
+    assert client.generate_json("hi") == {"ok": 1}
+    assert client.model == "ok-model"

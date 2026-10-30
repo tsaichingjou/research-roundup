@@ -14,8 +14,6 @@ llm:
   screening_models:
     - gemini-3.5-flash-lite
     - gemini-3.1-flash-lite
-    - gemini-2.5-flash-lite
-    - gemini-3.8-flash
   # The newsletter write-ups use a stronger model.
   analysis_models:
     - gemini-3.8-flash
@@ -24,7 +22,7 @@ llm:
     - gemini-2.5-flash
   temperature: 0.2
   min_interval_seconds: 4     # spacing between calls, to stay inside free-tier RPM limits
-  timeout_seconds: 90         # a model that times out twice is skipped for the next one
+  timeout_seconds: 90         # a model that times out or returns 5xx twice is skipped for the next one
 
 window:
   days: 31                    # an issue covers papers first seen or published in the last N days
