@@ -75,6 +75,8 @@ def print_enrichment(summary: dict) -> None:
           + (f" ({', '.join(f'{n} from {k}' for k, n in summary['found'].items())})" if found else ""))
     for src, c in sorted(summary["by_source"].items(), key=lambda kv: -kv[1]["tried"]):
         print(f"  {src[:46]:<46} {c['found']:>4} / {c['tried']:<4} recovered")
+    if summary.get("note"):
+        print(f"  Note: OpenAlex stopped early ({summary['note']}). Papers not found will be retried later.")
 
 
 def main() -> int:

@@ -30,7 +30,7 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from src.fetchers.http import FetchError, download
+from src.fetchers.http import FetchError, QuotaExceeded, download
 from src.fetchers.rss import clean_text
 from src.models import Paper
 
@@ -111,6 +111,7 @@ def resolve_institution(inst: dict, settings: dict, cache: dict) -> tuple[str, s
         if found:
             break
     cache[inst["id"]] = list(found) if found else None
+    _save_cache(cache)          # keep progress even if the run is interrupted
     return found
 
 
@@ -164,6 +165,16 @@ def fetch(source: dict, settings: dict) -> list[Paper]:
                      if (p := _to_paper(w, inst["id"], inst["name"]))]
             papers += found
             diagnostics[inst["name"]] = f"{len(found)} works ({oa_id}, matched '{oa_name}')"
+        except QuotaExceeded as exc:
+            # Budget gone: skip the remaining banks instead of failing each one slowly.
+            log.warning("[%s] %s; skipping the remaining institutions", source["id"], exc)
+            for rest in insts[insts.index(inst):]:
+                diagnostics.setdefault(rest["name"], f"skipped: {exc}")
+            if not papers:
+                _save_cache(cache)
+                source["_diagnostics"] = diagnostics
+                raise
+            break
         except (FetchError, ValueError, KeyError) as exc:
             failures += 1
             diagnostics[inst["name"]] = f"error: {str(exc)[:80]}"

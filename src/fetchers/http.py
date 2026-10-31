@@ -14,6 +14,10 @@ class FetchError(Exception):
     """Raised when a source cannot be downloaded after all retries."""
 
 
+class QuotaExceeded(FetchError):
+    """The API's daily budget is used up: retrying before it resets is pointless."""
+
+
 def download(url: str, settings: dict, params: dict | None = None) -> bytes:
     """GET with timeout and exponential back-off retries.
 
@@ -31,6 +35,10 @@ def download(url: str, settings: dict, params: dict | None = None) -> bytes:
             if resp.status_code == 429:
                 # Rate limited: wait as long as the server asks (or 5s, 10s, ...), then retry.
                 wait = _retry_after(resp) or 5.0 * attempt
+                if wait > 120:
+                    # A long wait means a daily budget is exhausted, not a short burst limit.
+                    raise QuotaExceeded(f"{url.split('/')[2]} daily budget used up; resets in "
+                                        f"about {wait / 3600:.1f} h (midnight UTC for OpenAlex)")
                 last_error = FetchError(f"{url} returned HTTP 429 (rate limited)")
                 log.warning("Rate limited by %s (attempt %d/%d); waiting %.0fs",
                             url.split("/")[2], attempt, retries, wait)
@@ -50,8 +58,9 @@ def download(url: str, settings: dict, params: dict | None = None) -> bytes:
 
 
 def _retry_after(resp) -> float | None:
-    value = resp.headers.get("Retry-After", "")
-    try:
-        return float(value)
-    except ValueError:
-        return None
+    for header in ("Retry-After", "X-RateLimit-Reset"):
+        try:
+            return float(resp.headers.get(header, ""))
+        except ValueError:
+            continue
+    return None

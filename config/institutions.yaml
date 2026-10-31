@@ -9,50 +9,52 @@
 #
 # group:   how the institution is presented in the newsletter and explorer.
 # aliases: other names to try when looking the institution up in OpenAlex.
-#          A wrong OpenAlex match can be pinned with  openalex_id: I123456789
+# openalex_id: the institution's OpenAlex ID. Pinned IDs skip the name search,
+#          which OpenAlex bills against a small daily budget. IDs below were
+#          resolved by name on 31 Oct 2026 and checked against the matched name.
 # =============================================================================
 
 institutions:
   # --- G10 central banks and the ECB ----------------------------------------
   # (The Federal Reserve Board, the US member of the G10, is fetched directly
   #  from Fed in Print together with the 12 regional banks.)
-  - {id: ecb, name: European Central Bank, group: G10 central banks and ECB, domains: [ecb.europa.eu], repec: [ecb]}
-  - {id: boj, name: Bank of Japan, group: G10 central banks and ECB, domains: [boj.or.jp]}
-  - {id: boe, name: Bank of England, group: G10 central banks and ECB, domains: [bankofengland.co.uk], repec: [boe]}
-  - {id: boc, name: Bank of Canada, group: G10 central banks and ECB, domains: [bankofcanada.ca], repec: [bca]}
-  - {id: buba, name: Deutsche Bundesbank, group: G10 central banks and ECB, aliases: ["Bundesbank"], domains: [bundesbank.de]}
-  - {id: bdf, name: Banque de France, group: G10 central banks and ECB, aliases: ["Bank of France"], domains: [banque-france.fr], repec: [bfr]}
-  - {id: bdi, name: Banca d'Italia, group: G10 central banks and ECB, aliases: ["Bank of Italy"], domains: [bancaditalia.it], repec: [bdi]}
-  - {id: dnb, name: De Nederlandsche Bank, group: G10 central banks and ECB, aliases: ["Dutch Central Bank"], domains: [dnb.nl], repec: [dnb]}
-  - {id: nbb, name: National Bank of Belgium, group: G10 central banks and ECB, aliases: ["Nationale Bank van België"], domains: [nbb.be], repec: [nbb]}
-  - {id: riksbank, name: Sveriges Riksbank, group: G10 central banks and ECB, aliases: ["Riksbank"], domains: [riksbank.se]}
-  - {id: snb, name: Swiss National Bank, group: G10 central banks and ECB, domains: [snb.ch], repec: [snb]}
+  - {id: ecb, name: European Central Bank, group: G10 central banks and ECB, openalex_id: I153515283, domains: [ecb.europa.eu], repec: [ecb]}
+  - {id: boj, name: Bank of Japan, group: G10 central banks and ECB, openalex_id: I47232531, domains: [boj.or.jp]}
+  - {id: boe, name: Bank of England, group: G10 central banks and ECB, openalex_id: I46860202, domains: [bankofengland.co.uk], repec: [boe]}
+  - {id: boc, name: Bank of Canada, group: G10 central banks and ECB, openalex_id: I898769471, domains: [bankofcanada.ca], repec: [bca]}
+  - {id: buba, name: Deutsche Bundesbank, group: G10 central banks and ECB, openalex_id: I74623043, aliases: ["Bundesbank"], domains: [bundesbank.de]}
+  - {id: bdf, name: Banque de France, group: G10 central banks and ECB, openalex_id: I201298700, aliases: ["Bank of France"], domains: [banque-france.fr], repec: [bfr]}
+  - {id: bdi, name: Banca d'Italia, group: G10 central banks and ECB, openalex_id: I103737770, aliases: ["Bank of Italy"], domains: [bancaditalia.it], repec: [bdi]}
+  - {id: dnb, name: De Nederlandsche Bank, group: G10 central banks and ECB, openalex_id: I96120398, aliases: ["Dutch Central Bank"], domains: [dnb.nl], repec: [dnb]}
+  - {id: nbb, name: National Bank of Belgium, group: G10 central banks and ECB, openalex_id: I98899809, aliases: ["Nationale Bank van België"], domains: [nbb.be], repec: [nbb]}
+  - {id: riksbank, name: Sveriges Riksbank, group: G10 central banks and ECB, openalex_id: I1307248880, aliases: ["Riksbank"], domains: [riksbank.se]}
+  - {id: snb, name: Swiss National Bank, group: G10 central banks and ECB, openalex_id: I32869367, domains: [snb.ch], repec: [snb]}
 
   # --- Other European national central banks --------------------------------
-  - {id: bde, name: Banco de España, group: European national central banks, aliases: ["Bank of Spain"], domains: [bde.es], repec: [bde]}
-  - {id: bdp, name: Banco de Portugal, group: European national central banks, aliases: ["Bank of Portugal"], domains: [bportugal.pt], repec: [ptu]}
+  - {id: bde, name: Banco de España, group: European national central banks, openalex_id: I185763367, aliases: ["Bank of Spain"], domains: [bde.es], repec: [bde]}
+  - {id: bdp, name: Banco de Portugal, group: European national central banks, openalex_id: I50310733, aliases: ["Bank of Portugal"], domains: [bportugal.pt], repec: [ptu]}
   - {id: bog, name: Bank of Greece, group: European national central banks, aliases: ["Bank of Greece (Greece)", "Central Bank of Greece"], domains: [bankofgreece.gr], repec: [bog]}
-  - {id: cbi, name: Central Bank of Ireland, group: European national central banks, domains: [centralbank.ie], repec: [cbi]}
+  - {id: cbi, name: Central Bank of Ireland, group: European national central banks, openalex_id: I29745156, domains: [centralbank.ie], repec: [cbi]}
   - {id: oenb, name: Oesterreichische Nationalbank, group: European national central banks, aliases: ["Österreichische Nationalbank", "Austrian National Bank", "Central Bank of Austria", "Austrian Central Bank"], domains: [oenb.at]}
-  - {id: bof, name: Bank of Finland, group: European national central banks, domains: [bof.fi, suomenpankki.fi]}
-  - {id: bcl, name: Banque centrale du Luxembourg, group: European national central banks, aliases: ["Central Bank of Luxembourg"], domains: [bcl.lu]}
-  - {id: nbs, name: National Bank of Slovakia, group: European national central banks, domains: [nbs.sk]}
-  - {id: bsi, name: Bank of Slovenia, group: European national central banks, domains: [bsi.si]}
-  - {id: eestipank, name: Eesti Pank, group: European national central banks, aliases: ["Bank of Estonia"], domains: [eestipank.ee]}
-  - {id: lb, name: Bank of Lithuania, group: European national central banks, domains: [lb.lt, lb.lt]}
-  - {id: bol, name: Latvijas Banka, group: European national central banks, aliases: ["Bank of Latvia"], domains: [bank.lv, makroekonomika.lv]}
-  - {id: cbm, name: Central Bank of Malta, group: European national central banks, domains: [centralbankmalta.org]}
-  - {id: cbc, name: Central Bank of Cyprus, group: European national central banks, domains: [centralbank.cy]}
-  - {id: hnb, name: Croatian National Bank, group: European national central banks, domains: [hnb.hr]}
-  - {id: norges, name: Norges Bank, group: European national central banks, domains: [norges-bank.no], repec: [bno]}
-  - {id: dn, name: Danmarks Nationalbank, group: European national central banks, aliases: ["National Bank of Denmark"], domains: [nationalbanken.dk]}
-  - {id: cnb, name: Czech National Bank, group: European national central banks, domains: [cnb.cz], repec: [cnb]}
-  - {id: nbp, name: Narodowy Bank Polski, group: European national central banks, aliases: ["National Bank of Poland"], domains: [nbp.pl], repec: [nbp]}
-  - {id: mnb, name: Magyar Nemzeti Bank, group: European national central banks, aliases: ["Central Bank of Hungary"], domains: [mnb.hu], repec: [mnb]}
-  - {id: bnr, name: National Bank of Romania, group: European national central banks, domains: [bnr.ro]}
-  - {id: bnb, name: Bulgarian National Bank, group: European national central banks, domains: [bnb.bg]}
-  - {id: cbi_is, name: Central Bank of Iceland, group: European national central banks, domains: [cb.is, sedlabanki.is]}
-  - {id: tcmb, name: Central Bank of the Republic of Türkiye, group: European national central banks, aliases: ["Central Bank of the Republic of Turkey"], domains: [tcmb.gov.tr]}
+  - {id: bof, name: Bank of Finland, group: European national central banks, openalex_id: I181188550, domains: [bof.fi, suomenpankki.fi]}
+  - {id: bcl, name: Banque centrale du Luxembourg, group: European national central banks, openalex_id: I191136970, aliases: ["Central Bank of Luxembourg"], domains: [bcl.lu]}
+  - {id: nbs, name: National Bank of Slovakia, group: European national central banks, openalex_id: I4210095671, domains: [nbs.sk]}
+  - {id: bsi, name: Bank of Slovenia, group: European national central banks, openalex_id: I16263579, domains: [bsi.si]}
+  - {id: eestipank, name: Eesti Pank, group: European national central banks, openalex_id: I4210111319, aliases: ["Bank of Estonia"], domains: [eestipank.ee]}
+  - {id: lb, name: Bank of Lithuania, group: European national central banks, openalex_id: I86463154, domains: [lb.lt, lb.lt]}
+  - {id: bol, name: Latvijas Banka, group: European national central banks, openalex_id: I2831913, aliases: ["Bank of Latvia"], domains: [bank.lv, makroekonomika.lv]}
+  - {id: cbm, name: Central Bank of Malta, group: European national central banks, openalex_id: I106707670, domains: [centralbankmalta.org]}
+  - {id: cbc, name: Central Bank of Cyprus, group: European national central banks, openalex_id: I113091926, domains: [centralbank.cy]}
+  - {id: hnb, name: Croatian National Bank, group: European national central banks, openalex_id: I4210113800, domains: [hnb.hr]}
+  - {id: norges, name: Norges Bank, group: European national central banks, openalex_id: I4387154682, domains: [norges-bank.no], repec: [bno]}
+  - {id: dn, name: Danmarks Nationalbank, group: European national central banks, openalex_id: I88189429, aliases: ["National Bank of Denmark"], domains: [nationalbanken.dk]}
+  - {id: cnb, name: Czech National Bank, group: European national central banks, openalex_id: I2800450866, domains: [cnb.cz], repec: [cnb]}
+  - {id: nbp, name: Narodowy Bank Polski, group: European national central banks, openalex_id: I90656587, aliases: ["National Bank of Poland"], domains: [nbp.pl], repec: [nbp]}
+  - {id: mnb, name: Magyar Nemzeti Bank, group: European national central banks, openalex_id: I162147314, aliases: ["Central Bank of Hungary"], domains: [mnb.hu], repec: [mnb]}
+  - {id: bnr, name: National Bank of Romania, group: European national central banks, openalex_id: I4210145726, domains: [bnr.ro]}
+  - {id: bnb, name: Bulgarian National Bank, group: European national central banks, openalex_id: I120674235, domains: [bnb.bg]}
+  - {id: cbi_is, name: Central Bank of Iceland, group: European national central banks, openalex_id: I4405282615, domains: [cb.is, sedlabanki.is]}
+  - {id: tcmb, name: Central Bank of the Republic of Türkiye, group: European national central banks, openalex_id: I202575966, aliases: ["Central Bank of the Republic of Turkey"], domains: [tcmb.gov.tr]}
   - {id: cbr, name: Bank of Russia, group: European national central banks, aliases: ["Central Bank of the Russian Federation"], domains: [cbr.ru]}
 
   # --- Other central banks (useful extra coverage, notably for EM) -----------

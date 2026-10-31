@@ -34,6 +34,7 @@ enrichment:                   # recover missing abstracts before excluding a pap
   landing_page: true          # abstract metadata tags on the paper's own page
   retry_after_days: 7         # a paper not found is retried a week later
   max_per_run: 300
+  max_title_searches: 40      # OpenAlex bills title searches (DOI lookups are free): cap per run
 
 prefilter:
   min_abstract_chars: 200     # papers still without a usable abstract are excluded (and logged)

@@ -44,8 +44,10 @@ pip install -r requirements.txt
 cp .env.example .env               # then paste your Gemini API key into .env
 ```
 
-Get a free Gemini API key at <https://aistudio.google.com/apikey>. The `.env`
-file is git-ignored, so the key never reaches the repository.
+Get a free Gemini API key at <https://aistudio.google.com/apikey>, and
+optionally a free OpenAlex key at <https://openalex.org/settings/api>
+(`OPENALEX_API_KEY`; it raises OpenAlex's daily budget tenfold). The `.env`
+file is git-ignored, so keys never reach the repository.
 
 ## Usage
 
@@ -110,8 +112,18 @@ OpenAlex institution IDs exactly (with aliases such as "Bank of Italy" for Banca
 d'Italia), cached, and can be pinned by ID; `check-sources` lists the match and
 the number of works for every bank. Each paper is credited to its bank, so the
 newsletter cites the Bank of Japan, not an aggregator. Requests are spaced out
-and rate-limit responses (HTTP 429) are waited out, as OpenAlex throttles
-bursts. The Research Hub stays on as a supplement, with items attributed to
+and short rate-limit responses (HTTP 429) are waited out.
+
+**OpenAlex budget.** OpenAlex bills usage against a daily budget: $0.10 without
+a key, $1 with a free key (set `OPENALEX_API_KEY` in `.env`). Name searches cost
+ten times more than filtered lists, and single-record lookups by DOI are free.
+The agent is built around this: central-bank IDs are pinned in
+`config/institutions.yaml` (no searches needed), abstract recovery prefers
+free DOI lookups and caps paid title searches per run, and when the budget is
+exhausted (a 429 asking to wait hours) the run stops calling OpenAlex at once,
+keeps everything fetched so far and reports when the budget resets, instead of
+retrying for hours. During development the anonymous budget ran out in one
+afternoon of repeated test runs, which is what prompted these safeguards. The Research Hub stays on as a supplement, with items attributed to
 their bank from the link's domain and Fed or BIS items skipped as duplicates.
 
 Coverage is limited to the groups the brief names (G10 and European central

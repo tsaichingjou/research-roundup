@@ -118,3 +118,55 @@ def test_download_waits_on_429_then_succeeds(monkeypatch):
     monkeypatch.setattr(http.time, "sleep", waits.append)
     assert http.download("https://api.openalex.org/works", {"max_retries": 3}) == b"ok"
     assert waits == [7.0]
+
+
+def test_long_retry_after_means_quota_exceeded(monkeypatch):
+    from src.fetchers import http
+
+    class Resp:
+        status_code, headers = 429, {"Retry-After": "34734"}
+
+    sleeps = []
+    monkeypatch.setattr(http.requests, "get", lambda *a, **k: Resp())
+    monkeypatch.setattr(http.time, "sleep", sleeps.append)
+    with pytest.raises(http.QuotaExceeded, match="resets in about 9.6 h"):
+        http.download("https://api.openalex.org/works", {"max_retries": 3})
+    assert sleeps == []                                   # no pointless waiting
+
+
+def test_quota_exceeded_stops_remaining_banks_but_keeps_results(api, monkeypatch):
+    from src.fetchers.http import QuotaExceeded
+    inner = openalex.download
+
+    def quota_after_ecb(url, settings, params=None):
+        if "institutions.id:I1" not in (params or {}).get("filter", "") and url.endswith("/works"):
+            raise QuotaExceeded("api.openalex.org daily budget used up")
+        return inner(url, settings, params)
+
+    monkeypatch.setattr(openalex, "download", quota_after_ecb)
+    insts = [{**INSTS[0], "openalex_id": "I1"}, {**INSTS[2], "openalex_id": "I3"},
+             {"id": "x", "name": "Another Bank", "group": "G", "openalex_id": "I7"}]
+    src = {"id": "cb", "name": "CB", "institutions": True, "_institutions": insts}
+    papers = openalex.fetch(src, {})
+    assert [p.title for p in papers] == ["ECB paper"]
+    assert src["_diagnostics"]["Banca d'Italia"].startswith("skipped")
+    assert src["_diagnostics"]["Another Bank"].startswith("skipped")
+    assert not any(c[0].endswith("/institutions") for c in api)   # pinned IDs: no paid search
+
+
+def test_enrichment_stops_using_openalex_after_quota(monkeypatch):
+    from src import enrich
+    from src.fetchers.http import QuotaExceeded
+    calls = []
+
+    def fake(url, settings, params=None):
+        calls.append(url)
+        if "openalex" in url:
+            raise QuotaExceeded("budget used up")
+        raise FetchError("HTTP 403")
+
+    monkeypatch.setattr(enrich, "download", fake)
+    e = enrich.Enricher({})
+    for i in range(3):
+        e.enrich({"uid": str(i), "title": "T", "url": f"https://doi.org/10.1/{i}"})
+    assert sum("openalex" in c for c in calls) == 1 and e.quota_note

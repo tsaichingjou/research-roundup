@@ -27,7 +27,7 @@ from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from html.parser import HTMLParser
 
-from src.fetchers.http import FetchError, download
+from src.fetchers.http import FetchError, QuotaExceeded, download
 from src.fetchers.openalex import reconstruct_abstract  # noqa: F401 (re-exported)
 from src.fetchers.rss import clean_text
 from src.models import normalise_title
@@ -82,13 +82,16 @@ def abstract_from_html(html: str, min_chars: int) -> str | None:
 
 class Enricher:
     def __init__(self, settings: dict, min_chars: int = 200, use_openalex: bool = True,
-                 use_landing_page: bool = True):
+                 use_landing_page: bool = True, max_title_searches: int = 40):
         # Lookups are best-effort: one quick attempt each, no long retry loops.
         self.settings = {**settings, "max_retries": 1, "request_timeout_seconds": 15}
         self.min_chars = min_chars
         self.use_openalex = use_openalex
         self.use_landing_page = use_landing_page
         self.mailto = settings.get("contact_email")
+        # DOI lookups are free on OpenAlex; title searches are billed, so they are capped.
+        self.title_searches_left = max_title_searches
+        self.quota_note = None
         self.api_key = os.environ.get("OPENALEX_API_KEY")
 
     def _openalex_params(self, **extra) -> dict:
@@ -106,6 +109,9 @@ class Enricher:
                                        params=self._openalex_params()))
             candidates = [data]
         else:
+            if self.title_searches_left <= 0:
+                return None
+            self.title_searches_left -= 1
             data = json.loads(download(f"{OPENALEX}/works", self.settings,
                                        params=self._openalex_params(search=paper["title"][:200], per_page=3)))
             candidates = data.get("results", [])
@@ -127,8 +133,15 @@ class Enricher:
         if self.use_landing_page and not paper["url"].lower().endswith(".pdf"):
             steps.append(("publisher page", self.from_landing_page))
         for name, step in steps:
+            if name == "OpenAlex" and not self.use_openalex:
+                continue
             try:
                 text = step(paper)
+            except QuotaExceeded as exc:
+                self.use_openalex = False          # stop calling OpenAlex for the rest of this run
+                self.quota_note = str(exc)
+                log.warning("OpenAlex: %s; continuing with publisher pages only", exc)
+                continue
             except (FetchError, ValueError, KeyError) as exc:
                 log.debug("%s lookup failed for %s: %s", name, paper["uid"], exc)
                 continue
@@ -145,7 +158,8 @@ def run_enrichment(storage: Storage, settings: dict, cfg: dict) -> dict:
     min_chars = cfg["prefilter"]["min_abstract_chars"]
     retry_before = (datetime.now(timezone.utc) - timedelta(days=ecfg.get("retry_after_days", 7))).isoformat()
     todo = storage.papers_missing_abstract(min_chars, retry_before)[: ecfg.get("max_per_run", 300)]
-    enricher = Enricher(settings, min_chars, ecfg.get("openalex", True), ecfg.get("landing_page", True))
+    enricher = Enricher(settings, min_chars, ecfg.get("openalex", True), ecfg.get("landing_page", True),
+                        ecfg.get("max_title_searches", 40))
     found, by_source = Counter(), {}
     for i, paper in enumerate(todo, 1):
         result = enricher.enrich(paper)
@@ -160,4 +174,4 @@ def run_enrichment(storage: Storage, settings: dict, cfg: dict) -> dict:
             storage.mark_enrich_tried(paper["uid"])
         if i % 20 == 0:
             log.info("Abstract lookup: %d/%d papers tried, %d recovered", i, len(todo), sum(found.values()))
-    return {"tried": len(todo), "found": found, "by_source": by_source}
+    return {"tried": len(todo), "found": found, "by_source": by_source, "note": enricher.quota_note}
