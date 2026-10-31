@@ -155,6 +155,8 @@ class GeminiClient:
         for attempt in range(1, self.max_retries + 1):
             self._throttle()
             self.calls += 1
+            if attempt == 1 and self.calls == 1:
+                log.info("Calling %s (can take up to %ss if the model is busy)", self.model, self.timeout)
             try:
                 resp = requests.post(url, headers=self._headers(), json=body, timeout=self.timeout)
             except requests.Timeout:

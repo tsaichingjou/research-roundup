@@ -225,9 +225,13 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
 
     # 4. deep analysis (cached)
     entries = []
-    for p in selected:
+    if selected:
+        log.info("Selected %d papers; writing up those without a cached analysis", len(selected))
+    for i, p in enumerate(selected, 1):
         analysis = None if rewrite else storage.get_analysis(p["uid"])
         if analysis is None:
+            log.info("Writing up %d/%d with %s: %s", i, len(selected),
+                     getattr(analysis_client, "model", "LLM"), p["title"][:70])
             try:
                 analysis = analyse_paper(p, analysis_client)
             except LLMAuthError:
