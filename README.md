@@ -27,6 +27,7 @@ sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screenin
 | `config/analysis.yaml` | LLM models, time window, pre-filter rules, screening batch size and selection rules. |
 | `src/llm.py` | Gemini REST client: JSON mode, throttling, back-off on rate limits, model fallback. |
 | `src/prompts.py` | Screening and analysis prompts, including the EM / DM / Transversal definitions. |
+| `src/enrich.py` | Recovers missing abstracts from OpenAlex and publisher pages before papers are written off. |
 | `src/analysis.py` | Pre-filter → batched screening → selection → deep analysis, all cached in SQLite. |
 | `src/issues.py` | Freezes the selection into a monthly issue with an editor's note; past issues never change. |
 | `src/site.py`, `templates/` | Builds the static site: one email-ready newsletter per issue and the interactive explorer. |
@@ -52,6 +53,7 @@ file is git-ignored, so the key never reaches the repository.
 python main.py fetch                 # fetch all enabled sources
 python main.py fetch --only nber     # fetch one source
 python main.py check-sources         # test every feed without storing: items, abstracts, newest date
+python main.py enrich                # recover missing abstracts (also runs automatically after fetch)
 python main.py show --limit 10       # list the latest stored papers
 python main.py models                # list Gemini models your key can use
 python main.py check                 # test each configured model and its response time
@@ -92,10 +94,18 @@ websites; the trade-off is dependence on the Hub's update lag.
 reports items, how many have usable abstracts, and the newest date — the first
 thing to run when a source looks quiet.
 
-**Known fallbacks.** JPE and some journal records carry no abstract in Crossref,
-so those papers are listed but not assessed (as agreed for paywalled sources);
-Fed in Print feeds also include speeches and articles, which are excluded when
-they lack an abstract or are screened out as low relevance.
+**Missing abstracts.** Some channels deliver titles without abstracts (Crossref
+records for JPE, some BIS and Fed in Print items). After every fetch the agent
+tries two open sources before giving up on a paper (`src/enrich.py`):
+**OpenAlex**, a free scholarly index, by DOI or near-exact title; then the
+abstract metadata tags (`citation_abstract`, `dc.description`, `og:description`)
+on the paper's own page, which publishers expose even when the full text is
+paywalled. No paywall is bypassed and no full text is downloaded. The source of
+each recovered abstract is stored and shown in the explorer and the newsletter.
+Papers still without an abstract are listed but not assessed, as agreed for
+paywalled sources, and counted per source in every issue. Fed in Print feeds
+also include speeches and articles, which are excluded when they lack an
+abstract or screened out as low relevance.
 
 ## Reliability design
 
@@ -168,6 +178,17 @@ instructed not to state findings that are not in them.
   teal) were checked for colour-blind separation, and every tag also carries its
   text label, so meaning never depends on colour alone. Responsive down to
   phone width, keyboard-accessible, and without external scripts.
+
+**"In the newsletter"** marks the 5–8 papers chosen for an issue: the highest
+relevance scores, at least 6/10, no more than two per source, with an
+emerging-markets paper swapped in when one qualifies but missed the cut. The
+explorer states these rules next to each issue, reading them from
+`config/analysis.yaml` so the explanation always matches the code.
+
+**Audience.** The site is prepared for Crédit Agricole CIB Global Market
+Research: a deep-green header and a "Prepared for…" line set in plain text.
+No logo or official branding is used, and every page states that it is a
+candidate assessment, not an official publication (`config/site.yaml`).
 
 Issues are frozen when published: re-running `publish` in the same month
 replaces that month's issue, but earlier issues are never changed.

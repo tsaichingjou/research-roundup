@@ -28,8 +28,15 @@ llm:
 window:
   days: 31                    # an issue covers papers first seen or published in the last N days
 
+enrichment:                   # recover missing abstracts before excluding a paper (src/enrich.py)
+  enabled: true
+  openalex: true              # free scholarly index, by DOI or exact title
+  landing_page: true          # abstract metadata tags on the paper's own page
+  retry_after_days: 7         # a paper not found is retried a week later
+  max_per_run: 300
+
 prefilter:
-  min_abstract_chars: 200     # papers without a usable abstract are excluded (and logged)
+  min_abstract_chars: 200     # papers still without a usable abstract are excluded (and logged)
   exclude_title_patterns:     # non-research items
     - "^comment on"
     - "^reply to"

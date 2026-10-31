@@ -81,6 +81,12 @@ class Storage:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as conn:
             conn.executescript(SCHEMA)
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(papers)")}
+            # migrations for databases created before these columns existed
+            if "abstract_source" not in cols:
+                conn.execute("ALTER TABLE papers ADD COLUMN abstract_source TEXT")
+            if "enrich_tried_at" not in cols:
+                conn.execute("ALTER TABLE papers ADD COLUMN enrich_tried_at TEXT")
 
     @contextmanager
     def _conn(self):
@@ -179,6 +185,31 @@ class Storage:
                     (r["uid"], r["status"], r.get("score"), r.get("market_focus"),
                      r.get("topic"), r.get("reason"), model, now),
                 )
+
+    # -- abstract enrichment ------------------------------------------------------
+    def papers_missing_abstract(self, min_chars: int, retry_before_iso: str) -> list[dict]:
+        """Papers whose abstract is too short and that were not tried recently."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT * FROM papers WHERE LENGTH(COALESCE(abstract, '')) < ?
+                   AND (enrich_tried_at IS NULL OR enrich_tried_at < ?)""",
+                (min_chars, retry_before_iso),
+            ).fetchall()
+        return [_paper_dict(r) for r in rows]
+
+    def set_abstract(self, uid: str, abstract: str, source: str) -> None:
+        """Store a recovered abstract and clear a 'no abstract' exclusion so the
+        paper is screened on the next run."""
+        with self._conn() as conn:
+            conn.execute("UPDATE papers SET abstract = ?, abstract_source = ?, enrich_tried_at = ? WHERE uid = ?",
+                         (abstract, source, datetime.now(timezone.utc).isoformat(), uid))
+            conn.execute("DELETE FROM screening WHERE uid = ? AND status = 'excluded' "
+                         "AND reason = 'no abstract available'", (uid,))
+
+    def mark_enrich_tried(self, uid: str) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE papers SET enrich_tried_at = ? WHERE uid = ?",
+                         (datetime.now(timezone.utc).isoformat(), uid))
 
     def save_issue(self, issue: dict) -> None:
         with self._conn() as conn:

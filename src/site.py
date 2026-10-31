@@ -76,7 +76,7 @@ def collect(storage: Storage, sources_cfg: dict) -> dict:
             "uid": p["uid"], "title": p["title"], "url": p["url"],
             "source": p["source_id"], "authors": p["authors"],
             "published": p["published"], "fetched_at": p["fetched_at"],
-            "abstract": p["abstract"],
+            "abstract": p["abstract"], "abstract_source": p.get("abstract_source"),
             "status": s.get("status", "pending"),
             "score": s.get("score"), "focus": (a or {}).get("market_focus") or s.get("market_focus"),
             "topic": s.get("topic"), "reason": s.get("reason"),
@@ -102,8 +102,9 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
             if k.startswith("excluded"):
                 excluded.append({"source": data["sources"].get(src, {}).get("name", src),
                                  "reason": k.removeprefix("excluded: "), "n": v})
+    recovered = sum(c.get("abstract recovered", 0) for c in cov.values())
     return {
-        "site": site, "issue": issue, "entries": entries, "focus": FOCUS,
+        "site": site, "issue": issue, "entries": entries, "focus": FOCUS, "recovered": recovered,
         "sources": data["sources"],
         "composition": [(k, composition[k]) for k in FOCUS if composition[k]],
         "n_sources": len(cov),
@@ -114,13 +115,14 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
 
 
 def build_site(storage: Storage, sources_cfg: dict, site_cfg: dict,
-               out_dir: Path | None = None) -> dict:
+               out_dir: Path | None = None, selection: dict | None = None) -> dict:
     out = Path(out_dir or ROOT / site_cfg.get("output_dir", "docs"))
     (out / "issues").mkdir(parents=True, exist_ok=True)
     (out / "data").mkdir(parents=True, exist_ok=True)
     env = Environment(loader=FileSystemLoader(ROOT / "templates"),
                       autoescape=select_autoescape(["html", "j2"]), trim_blocks=True, lstrip_blocks=True)
     data = collect(storage, sources_cfg)
+    data["selection"] = selection
 
     for issue in data["issues"]:
         html = env.get_template("newsletter.html.j2").render(**issue_context(data, issue, site_cfg))

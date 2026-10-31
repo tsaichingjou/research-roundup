@@ -1,6 +1,6 @@
 {#- Email-safe newsletter: table layout + inline styles (Outlook, Gmail, Apple Mail).
     The <style> block only adds mobile refinements; the email reads fine without it. -#}
-{% set ink = "#172033" %}{% set muted = "#5a6577" %}{% set rule = "#d5dbe3" %}{% set mist = "#eef1f5" %}
+{% set ink = "#172033" %}{% set brand = "#0d5546" %}{% set muted = "#5a6577" %}{% set rule = "#d5dbe3" %}{% set mist = "#eef1f5" %}
 {% set serif = "Georgia, 'Times New Roman', serif" %}
 {% set sans = "'Helvetica Neue', Helvetica, Arial, sans-serif" %}
 <!DOCTYPE html>
@@ -28,7 +28,9 @@
 <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%; max-width:640px; background:#ffffff; border:1px solid {{ rule }};">
 
   {# ---- Masthead ---- #}
-  <tr><td class="px" style="padding:36px 40px 8px 40px;">
+  <tr><td height="6" bgcolor="{{ brand }}" style="height:6px; background:{{ brand }}; font-size:0; line-height:0;">&nbsp;</td></tr>
+  <tr><td class="px" style="padding:30px 40px 8px 40px;">
+    {% if site.prepared_for %}<p style="margin:0 0 10px 0; font-family:{{ sans }}; font-size:13px; line-height:1.4; color:{{ brand }};">Prepared for {{ site.prepared_for }}</p>{% endif %}
     <p class="masthead" style="margin:0; font-family:{{ serif }}; font-size:32px; line-height:1.15; color:{{ ink }};">{{ site.title }}</p>
     <p style="margin:8px 0 0 0; font-family:{{ sans }}; font-size:15px; line-height:1.5; color:{{ muted }};">{{ issue.title }} issue, covering research published {{ window }}</p>
   </td></tr>
@@ -122,6 +124,9 @@
   <tr><td class="px" bgcolor="{{ mist }}" style="padding:26px 40px 30px 40px; background:{{ mist }}; font-family:{{ sans }}; font-size:13px; line-height:1.6; color:{{ muted }};">
     <p style="margin:0 0 8px 0; font-size:14px; font-weight:bold; color:{{ ink }};">How this issue was made</p>
     <p style="margin:0 0 10px 0;">An automated agent screened {{ issue.stats.n_candidates }} new publications from {{ n_sources }} sources ({{ window }}). {{ issue.stats.n_scored }} with a usable abstract were scored for market relevance by a language model, and the {{ entries|length }} above were selected, with at most two papers per source.</p>
+    {% if recovered %}
+    <p style="margin:0 0 10px 0;">For {{ recovered }} papers whose feed carried no abstract, the abstract was recovered from OpenAlex or the publisher's page before screening.</p>
+    {% endif %}
     {% if excluded %}
     <p style="margin:0 0 10px 0;">Not assessed this cycle:
       {% for x in excluded %}{{ x.n }} from {{ x.source }} ({{ x.reason }}){{ "; " if not loop.last else "." }}{% endfor %}
@@ -130,6 +135,7 @@
     <p style="margin:0 0 10px 0;">Market focus: <strong style="color:{{ focus.EM.color }};">Emerging markets</strong> for research centred on emerging or developing economies, <strong style="color:{{ focus.DM.color }};">Developed markets</strong> for advanced economies, and <strong style="color:{{ focus.Transversal.color }};">Transversal</strong> for work spanning both or tied to neither.</p>
     <p style="margin:0 0 10px 0;">Summaries are written by {{ issue.stats.models|join(", ") or "a language model" }} from each paper's title and abstract only, and may contain errors. Check the original paper before relying on a finding.</p>
     <p style="margin:0;"><a href="{{ site.site_url }}" style="color:#2c5bb8; text-decoration:underline;">Explore every paper screened this month</a></p>
+    {% if site.disclaimer %}<p style="margin:12px 0 0 0; font-size:12px;">{{ site.disclaimer }}</p>{% endif %}
   </td></tr>
 
 </table>

@@ -18,6 +18,9 @@
     --mist: #eef1f5;
     --paper: #ffffff;
     --link: #2c5bb8;
+    --brand: #0d5546;        /* deep green chrome, chosen for the audience; not a logo colour match */
+    --brand-dark: #093f34;
+    --brand-tint: #e4efeb;
     --em: #a8680a;  --em-tint: #f7efe3;
     --dm: #2c5bb8;  --dm-tint: #e8eef9;
     --tr: #18876b;  --tr-tint: #e3f3ee;
@@ -36,16 +39,19 @@
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   /* ---- header ---- */
-  header.top { background: var(--paper); border-bottom: 1px solid var(--rule); }
+  header.top { background: var(--brand); color: #fff; }
+  header.top .prepared { font-size: 13px; color: #cfe3dc; margin-top: 2px; }
+  header.top select { border-color: transparent; color: var(--ink); }
   .top .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding-top: 18px; padding-bottom: 18px; }
   .brand { font: 600 24px/1.1 var(--serif); margin: 0; letter-spacing: -0.01em; }
-  .brand small { display: block; font: 400 14px/1.4 var(--sans); color: var(--muted); letter-spacing: 0; margin-top: 4px; }
+  .brand small { display: block; font: 400 14px/1.4 var(--sans); color: #cfe3dc; letter-spacing: 0; margin-top: 4px; }
   .top-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   select { max-width: 100%; border: 1px solid var(--rule); background: var(--paper); border-radius: var(--radius); padding: 8px 32px 8px 12px; appearance: none;
     background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
     background-position: calc(100% - 17px) 55%, calc(100% - 12px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ink); background: var(--ink); color: #fff; border-radius: var(--radius); padding: 8px 14px; text-decoration: none; font-weight: 600; }
-  .btn:hover { background: #2a3754; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #fff; background: #fff; color: var(--brand); border-radius: var(--radius); padding: 8px 14px; text-decoration: none; font-weight: 600; }
+  .btn:hover { background: var(--brand-tint); }
+  header.top :focus-visible { outline-color: #fff; }
 
   /* ---- issue band: the composition strip is the page's signature ---- */
   .issue { background: var(--paper); border-bottom: 1px solid var(--rule); }
@@ -63,13 +69,16 @@
   .strip-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 10px; color: var(--muted); font-size: 14px; }
   .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
   .empty-issue { grid-column: 1 / -1; color: var(--muted); }
+  details.rules { margin-top: 14px; font-size: 14px; color: var(--muted); max-width: 90ch; }
+  details.rules summary { cursor: pointer; color: var(--link); width: fit-content; }
+  details.rules p { margin: 8px 0 0; line-height: 1.6; }
 
   /* ---- controls ---- */
   .controls { padding-top: 22px; padding-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
   .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; background: var(--paper); }
   .seg button { border: 0; background: transparent; padding: 7px 12px; cursor: pointer; color: var(--muted); }
   .seg button + button { border-left: 1px solid var(--rule); }
-  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; }
   .chip { border: 1px solid var(--rule); background: var(--paper); border-radius: 999px; padding: 6px 12px 6px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; color: var(--ink); }
   .chip .n { color: var(--muted); font-variant-numeric: tabular-nums; }
   .chip[aria-pressed="false"] { color: var(--faint); background: transparent; }
@@ -83,7 +92,7 @@
   .list li + li { border-top: 1px solid var(--rule); }
   .row { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 0 14px; width: 100%; text-align: left; border: 0; background: transparent; padding: 14px 16px 14px 0; cursor: pointer; }
   .row:hover { background: #f7f9fb; }
-  .row[aria-current="true"] { background: #f1f4f8; }
+  .row[aria-current="true"] { background: var(--brand-tint); }
   .row .bar { border-radius: 0 2px 2px 0; }
   .row .t { font: 400 17px/1.35 var(--serif); }
   .row .m { color: var(--muted); font-size: 13px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
@@ -158,7 +167,9 @@
 <body>
 <header class="top">
   <div class="wrap">
-    <h1 class="brand">{{ site.title }}<small>Paper explorer</small></h1>
+    <div>
+      <h1 class="brand">{{ site.title }}<small>Paper explorer{% if site.prepared_for %}, prepared for {{ site.prepared_for }}{% endif %}</small></h1>
+    </div>
     <div class="top-actions">
       <label class="visually-hidden" for="issue-select">Issue</label>
       <select id="issue-select"></select>
@@ -174,7 +185,7 @@
 <div class="wrap">
   <div class="controls" role="group" aria-label="Filter papers">
     <div class="seg" id="scope" role="group" aria-label="Which papers">
-      <button type="button" data-scope="featured" aria-pressed="true">Featured</button>
+      <button type="button" data-scope="featured" aria-pressed="true">In the newsletter</button>
       <button type="button" data-scope="screened" aria-pressed="false">All screened</button>
     </div>
     <div id="focus-chips" role="group" aria-label="Market focus" style="display:flex;gap:8px;flex-wrap:wrap"></div>
@@ -216,6 +227,7 @@
 <script>
 (() => {
   const DATA = JSON.parse(document.getElementById("site-data").textContent);
+  const DISCLAIMER = {{ (site.disclaimer or "")|tojson }};
   const FOCUS = DATA.focus;
   const FOCUS_KEYS = ["EM", "DM", "Transversal"];
   const VAR = { EM: "var(--em)", DM: "var(--dm)", Transversal: "var(--tr)" };
@@ -288,6 +300,21 @@
     return out;
   }
 
+  // ---------- how papers are chosen (rules come from config/analysis.yaml) ----------
+  function rulesNote() {
+    const s = DATA.selection;
+    if (!s) return "";
+    return `<details class="rules"><summary>How papers are chosen for the newsletter</summary>
+      <p>Every new paper with an abstract is scored from 0 to 10 for its relevance to markets research
+      (monetary policy, rates, FX, credit, financial stability, capital flows, the macro outlook) by a language model,
+      which also labels its market focus. The newsletter then takes the highest-scoring papers, between
+      ${s.min_papers} and ${s.max_papers} per issue, with three rules: a paper needs at least ${s.min_score} out of 10;
+      no source contributes more than ${s.max_per_source}, so one prolific institution cannot fill the issue; and if no
+      emerging-markets paper made the cut but one qualifies, it replaces the lowest-ranked pick.
+      Papers without a usable abstract, even after looking it up in OpenAlex and on the publisher's page, are listed
+      but not assessed.</p></details>`;
+  }
+
   // ---------- issue band ----------
   function renderIssue() {
     const issue = currentIssue();
@@ -295,7 +322,7 @@
     const link = $("read-link");
     if (!issue) {
       band.innerHTML = issues.length
-        ? `<div><h2 id="issue-title">All issues</h2><p class="window">${issues.length} issue${issues.length > 1 ? "s" : ""} published, ${DATA.papers.filter(p => p.issues.length).length} papers featured</p></div>`
+        ? `<div><h2 id="issue-title">All issues</h2><p class="window">${issues.length} issue${issues.length > 1 ? "s" : ""} published, ${DATA.papers.filter(p => p.issues.length).length} papers in newsletters</p></div>`
         : `<div><h2 id="issue-title">No issue published yet</h2><p class="window">Run <code>python main.py publish</code> to create the first issue. Every screened paper is listed below.</p></div>`;
       link.style.display = issues.length ? "" : "none";
       if (issues.length) link.href = `issues/${issues[0].id}.html`, link.textContent = `Read the ${issues[0].title} issue`;
@@ -307,15 +334,16 @@
     band.innerHTML = `
       <div><h2 id="issue-title">${esc(issue.title)}</h2>
         <p class="window">Research published ${fmtDate(issue.stats.window_start)} to ${fmtDate(issue.stats.window_end)}.
-        ${papers.length} featured from ${issue.stats.n_candidates} screened.</p></div>
+        ${papers.length} chosen for the newsletter from ${issue.stats.n_candidates} screened.</p></div>
       <p class="intro">${esc(issue.intro)}</p>
       <div class="strip-block">
-        <ul class="strip" aria-label="Featured papers, coloured by market focus">
+        <ul class="strip" aria-label="Papers in this newsletter, coloured by market focus">
           ${papers.map(p => `<li><button type="button" data-uid="${p.uid}" style="background:${VAR[p.focus]}"
               aria-pressed="${state.selected === p.uid}" aria-label="${esc(focusLabel(p.focus))}: ${esc(p.title)}"></button></li>`).join("")}
         </ul>
         <div class="strip-legend">${FOCUS_KEYS.filter(k => counts[k]).map(k =>
           `<span><span class="swatch" style="background:${VAR[k]}"></span>${counts[k]} ${esc(focusLabel(k).toLowerCase())}</span>`).join("")}</div>
+        ${rulesNote()}
       </div>`;
     band.querySelectorAll(".strip button").forEach(b => {
       b.addEventListener("click", () => { state.scope = "featured"; select(b.dataset.uid); render(); });
@@ -344,7 +372,7 @@
     if (!papers.length) { list.innerHTML = `<li class="none">No papers match these filters. Clear the search or select more market focus labels.</li>`; return; }
     list.innerHTML = papers.map(p => {
       const sameIssue = state.scope === "featured" && currentIssue();
-      const featured = p.issues.length && !sameIssue ? `<span class="star">Featured ${esc(p.issues.map(i => (issues.find(x => x.id === i) || {}).title || i).join(", "))}</span>` : "";
+      const featured = p.issues.length && !sameIssue ? `<span class="star">In the ${esc(p.issues.map(i => (issues.find(x => x.id === i) || {}).title || i).join(", "))} newsletter</span>` : "";
       const status = p.status === "excluded" ? `<span>Not assessed: ${esc(p.reason)}</span>` : (p.focus ? `<span style="color:${VAR[p.focus]};font-weight:600">${esc(focusLabel(p.focus))}</span>` : "");
       return `<li><button type="button" class="row" data-uid="${p.uid}" aria-current="${state.selected === p.uid}">
         <span class="bar" style="background:${p.focus ? VAR[p.focus] : "var(--none)"}"></span>
@@ -379,10 +407,11 @@
       <dl class="facts">
         <dt>Source</dt><dd>${esc(srcName(p.source))}</dd>
         <dt>Published</dt><dd>${fmtDate(p.published) || "Not stated"}</dd>
+        ${p.abstract_source ? `<dt>Abstract</dt><dd>Recovered from ${esc(p.abstract_source)} (not in the original feed)</dd>` : ""}
         ${p.score != null ? `<dt>Relevance</dt><dd>${p.score} of 10</dd>` : ""}
         ${a && a.topics && a.topics.length ? `<dt>Topics</dt><dd>${esc(a.topics.join(", "))}</dd>` : p.topic ? `<dt>Topic</dt><dd>${esc(p.topic)}</dd>` : ""}
         ${a && a.regions && a.regions.length ? `<dt>Regions</dt><dd>${esc(a.regions.join(", "))}</dd>` : ""}
-        ${p.issues.length ? `<dt>Featured in</dt><dd>${p.issues.map(i => { const x = issues.find(y => y.id === i); return `<a href="issues/${i}.html#p-${p.uid}">${esc(x ? x.title : i)}</a>`; }).join(", ")}</dd>` : ""}
+        ${p.issues.length ? `<dt>Newsletter</dt><dd>${p.issues.map(i => { const x = issues.find(y => y.id === i); return `<a href="issues/${i}.html#p-${p.uid}">${esc(x ? x.title : i)}</a>`; }).join(", ")}</dd>` : ""}
         ${a && a.model ? `<dt>Written by</dt><dd>${esc(a.model)}${a.confidence ? `, ${esc(a.confidence)} confidence` : ""}</dd>` : ""}
       </dl>
       ${p.abstract ? `<details class="abstract"><summary>Abstract</summary><p>${esc(p.abstract)}</p></details>` : ""}
@@ -425,7 +454,7 @@
       s.addEventListener("mouseleave", hideTip);
     });
     $("cov-table").innerHTML = `<caption id="cov-table-caption" class="visually-hidden">Papers per source</caption>
-      <thead><tr><th scope="col">Source</th><th scope="col">Group</th><th scope="col">Screened</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Not assessed</th><th scope="col">Featured</th></tr></thead>
+      <thead><tr><th scope="col">Source</th><th scope="col">Group</th><th scope="col">Screened</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Not assessed</th><th scope="col">In newsletter</th></tr></thead>
       <tbody>${rows.map(r => `<tr><td>${esc(srcName(r.id))}</td><td>${esc(groupOf(r.id))}</td>
         <td>${r.total}</td>${FOCUS_KEYS.map(k => `<td>${r[k]}</td>`).join("")}<td>${r.na}${r.reasons.length ? ` <span style="color:var(--muted)">(${esc(r.reasons.join(", "))})</span>` : ""}</td><td>${r.featured}</td></tr>`).join("")}</tbody>`;
   }
@@ -443,7 +472,7 @@
       const n = b.dataset.scope === "featured"
         ? (currentIssue() ? currentIssue().paper_uids.length : DATA.papers.filter(p => p.issues.length).length)
         : (currentIssue() ? DATA.papers.filter(p => inWindow(p, currentIssue())).length : DATA.papers.length);
-      b.textContent = `${b.dataset.scope === "featured" ? "Featured" : "All screened"} (${n})`;
+      b.textContent = `${b.dataset.scope === "featured" ? "In the newsletter" : "All screened"} (${n})`;
     });
     renderIssue();
     const base = scopePapers();
@@ -458,7 +487,8 @@
   }
 
   $("footer").innerHTML = `Data updated ${fmtDate(DATA.generated_at)}. ${DATA.papers.length} publications in the database from ${new Set(DATA.papers.map(p => p.source)).size} sources.
-    Summaries and classifications are produced by a language model from titles and abstracts and may contain errors. <a href="data/site.json">Download the data (JSON)</a>.`;
+    Summaries and classifications are produced by a language model from titles and abstracts and may contain errors. <a href="data/site.json">Download the data (JSON)</a>.
+    ${DISCLAIMER ? `<br>${esc(DISCLAIMER)}` : ""}`;
   document.addEventListener("keydown", e => { if (e.key === "Escape" && $("detail").classList.contains("open") && window.innerWidth <= 900) { state.selected = null; render(); } });
   render();
 })();

@@ -248,6 +248,8 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
     for p in candidates:
         c = by_source.setdefault(p["source_id"], Counter())
         c["candidates"] += 1
+        if p.get("abstract_source"):
+            c["abstract recovered"] += 1
         st = status[p["uid"]]
         if st.get("status") == "scored":
             c["scored"] += 1

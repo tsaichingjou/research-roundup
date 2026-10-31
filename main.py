@@ -4,6 +4,7 @@ Usage
     python main.py fetch                  # fetch all enabled sources
     python main.py fetch --only nber bis  # fetch selected sources
     python main.py check-sources          # test every source feed without storing anything
+    python main.py enrich                 # recover missing abstracts (also runs after fetch)
     python main.py show --limit 10        # list the most recent stored papers
     python main.py models                 # list Gemini models available to your API key
     python main.py check                  # test each configured model and its response time
@@ -29,6 +30,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from src.analysis import load_analysis_config, run_analysis  # noqa: E402
+from src.enrich import run_enrichment  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
 from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
 from src.issues import publish_issue  # noqa: E402
@@ -51,7 +53,7 @@ def print_analysis(report: dict) -> None:
     print("\nCoverage by source")
     print("-" * 70)
     for src, c in report["coverage"].items():
-        extra = ", ".join(f"{k} {v}" for k, v in c.items() if k.startswith("excluded"))
+        extra = ", ".join(f"{k} {v}" for k, v in c.items() if k.startswith(("excluded", "abstract")))
         print(f"  {src:<18} {c.get('candidates', 0):>4} candidates, {c.get('scored', 0):>4} scored"
               + (f"  ({extra})" if extra else ""))
     print(f"\nSelected for this issue: {len(report['entries'])}")
@@ -67,6 +69,14 @@ def print_analysis(report: dict) -> None:
         print(f"   Classification: {a['market_focus_rationale']}")
 
 
+def print_enrichment(summary: dict) -> None:
+    found = sum(summary["found"].values())
+    print(f"\nMissing abstracts: {summary['tried']} papers looked up, {found} recovered"
+          + (f" ({', '.join(f'{n} from {k}' for k, n in summary['found'].items())})" if found else ""))
+    for src, c in sorted(summary["by_source"].items(), key=lambda kv: -kv[1]["tried"]):
+        print(f"  {src[:46]:<46} {c['found']:>4} / {c['tried']:<4} recovered")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="The Research Roundup agent")
     parser.add_argument("--config", default=ROOT / "config" / "sources.yaml")
@@ -74,6 +84,8 @@ def main() -> int:
 
     p_fetch = sub.add_parser("fetch", help="Fetch new papers from enabled sources")
     p_fetch.add_argument("--only", nargs="+", help="Source ids to fetch")
+    p_fetch.add_argument("--no-enrich", action="store_true", help="Skip recovering missing abstracts")
+    sub.add_parser("enrich", help="Recover missing abstracts from OpenAlex and publisher pages")
 
     p_chk = sub.add_parser("check-sources", help="Test every source feed without storing anything")
     p_chk.add_argument("--only", nargs="+", help="Source ids to check")
@@ -116,7 +128,15 @@ def main() -> int:
             if len(r.breakdown) > 12:
                 print(f"      ... and {len(r.breakdown) - 12} more institutions")
         print(f"\nTotal papers in database: {storage.count()}")
+        if not args.no_enrich:
+            print_enrichment(run_enrichment(storage, config["settings"],
+                                            load_analysis_config(ROOT / "config" / "analysis.yaml")))
         return 0 if any(r.ok for r in results) else 1
+
+    if args.command == "enrich":
+        print_enrichment(run_enrichment(storage, config["settings"],
+                                        load_analysis_config(ROOT / "config" / "analysis.yaml")))
+        return 0
 
     if args.command == "check-sources":
         rows = check_sources(config, only=args.only)
@@ -137,7 +157,8 @@ def main() -> int:
     site_cfg = yaml.safe_load((ROOT / "config" / "site.yaml").read_text(encoding="utf-8"))
 
     def build() -> int:
-        res = build_site(storage, config, site_cfg)
+        selection = load_analysis_config(ROOT / "config" / "analysis.yaml")["selection"]
+        res = build_site(storage, config, site_cfg, selection=selection)
         out = res["out_dir"].relative_to(ROOT)
         print(f"Site built in {out}/: {len(res['issues'])} issue(s), {res['papers']} papers.")
         print(f"Open {out}/index.html in a browser to preview it.")

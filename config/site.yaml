@@ -3,6 +3,10 @@
 # =============================================================================
 title: The Research Roundup
 tagline: New economics research that matters for markets, selected and summarised each month.
+# Who the site is prepared for. Shown as plain text: no third-party logo or
+# branding is used, and the disclaimer makes clear it is not an official publication.
+prepared_for: Crédit Agricole CIB Global Market Research
+disclaimer: Candidate technical assessment. Not an official Crédit Agricole CIB publication.
 # Absolute address of the published site. Used for links inside the emailed
 # newsletter (relative links do not work in email clients).
 site_url: https://tsaichingjou.github.io/research-roundup/
