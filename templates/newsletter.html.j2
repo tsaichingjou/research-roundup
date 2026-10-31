@@ -1,0 +1,139 @@
+{#- Email-safe newsletter: table layout + inline styles (Outlook, Gmail, Apple Mail).
+    The <style> block only adds mobile refinements; the email reads fine without it. -#}
+{% set ink = "#172033" %}{% set muted = "#5a6577" %}{% set rule = "#d5dbe3" %}{% set mist = "#eef1f5" %}
+{% set serif = "Georgia, 'Times New Roman', serif" %}
+{% set sans = "'Helvetica Neue', Helvetica, Arial, sans-serif" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>{{ site.title }}: {{ issue.title }}</title>
+<style>
+  @media (max-width: 620px) {
+    .px { padding-left: 20px !important; padding-right: 20px !important; }
+    .masthead { font-size: 26px !important; }
+    .entry-title { font-size: 20px !important; }
+  }
+  a:hover { text-decoration: underline !important; }
+</style>
+</head>
+<body style="margin:0; padding:0; background:{{ mist }}; color:{{ ink }}; -webkit-text-size-adjust:100%;">
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">{{ issue.intro }}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{{ mist }}" style="background:{{ mist }};">
+<tr><td align="center" style="padding:28px 12px;">
+
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%; max-width:640px; background:#ffffff; border:1px solid {{ rule }};">
+
+  {# ---- Masthead ---- #}
+  <tr><td class="px" style="padding:36px 40px 8px 40px;">
+    <p class="masthead" style="margin:0; font-family:{{ serif }}; font-size:32px; line-height:1.15; color:{{ ink }};">{{ site.title }}</p>
+    <p style="margin:8px 0 0 0; font-family:{{ sans }}; font-size:15px; line-height:1.5; color:{{ muted }};">{{ issue.title }} issue, covering research published {{ window }}</p>
+  </td></tr>
+  <tr><td class="px" style="padding:20px 40px 4px 40px;">
+    <p style="margin:0; font-family:{{ sans }}; font-size:16px; line-height:1.65; color:{{ ink }};">{{ issue.intro }}</p>
+  </td></tr>
+
+  {# ---- Composition strip: one segment per featured paper, coloured by market focus ---- #}
+  <tr><td class="px" style="padding:24px 40px 6px 40px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">
+      <tr>
+      {% for e in entries %}
+        {% set f = focus[e.analysis.market_focus] %}
+        <td height="12" bgcolor="{{ f.color }}" title="{{ f.name }}: {{ e.title }}" style="height:12px; background:{{ f.color }}; border-right:3px solid #ffffff; font-size:0; line-height:0;">&nbsp;</td>
+      {% endfor %}
+      </tr>
+    </table>
+  </td></tr>
+  <tr><td class="px" style="padding:0 40px 28px 40px; font-family:{{ sans }}; font-size:13px; line-height:1.6; color:{{ muted }};">
+    {{ entries|length }} papers this month:
+    {% for label, n in composition %}<span style="white-space:nowrap;"><span style="display:inline-block; width:9px; height:9px; background:{{ focus[label].color }}; margin:0 5px 0 {{ '2px' if loop.first else '10px' }};"></span>{{ n }} {{ focus[label].name|lower if label != 'Transversal' else 'transversal' }}</span>{% endfor %}
+  </td></tr>
+
+  {# ---- In this issue ---- #}
+  <tr><td class="px" style="padding:0 40px 8px 40px;">
+    <p style="margin:0 0 10px 0; font-family:{{ sans }}; font-size:14px; font-weight:bold; color:{{ ink }};">In this issue</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    {% for e in entries %}
+      {% set f = focus[e.analysis.market_focus] %}
+      <tr>
+        <td width="4" bgcolor="{{ f.color }}" style="width:4px; background:{{ f.color }};"></td>
+        <td style="padding:7px 0 7px 12px; font-family:{{ sans }}; font-size:15px; line-height:1.45;">
+          <a href="#p-{{ e.uid }}" style="color:{{ ink }}; text-decoration:none;">{{ e.title }}</a>
+          <span style="color:{{ muted }}; font-size:13px;"><br>{{ sources[e.source].name }}</span>
+        </td>
+      </tr>
+      <tr><td colspan="2" height="4" style="font-size:0; line-height:0;">&nbsp;</td></tr>
+    {% endfor %}
+    </table>
+  </td></tr>
+
+  {# ---- Entries ---- #}
+  {% for e in entries %}
+  {% set a = e.analysis %}{% set f = focus[a.market_focus] %}
+  <tr><td class="px" style="padding:28px 40px 0 40px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-top:1px solid {{ rule }}; font-size:0; line-height:0;">&nbsp;</td></tr></table>
+  </td></tr>
+  <tr><td class="px" id="p-{{ e.uid }}" style="padding:18px 40px 0 40px;">
+    <a name="p-{{ e.uid }}"></a>
+    <p style="margin:0; font-family:{{ sans }}; font-size:13px; line-height:1.5; color:{{ muted }};">
+      <span style="display:inline-block; padding:2px 9px; border:1px solid {{ f.color }}; border-radius:10px; background:{{ f.tint }}; color:{{ f.color }}; font-weight:bold; margin-right:8px;">{{ f.name }}</span>{{ sources[e.source].name }}{% if e.published %}, {{ fmt_date(e.published) }}{% endif %}
+    </p>
+    <h2 class="entry-title" style="margin:12px 0 0 0; font-family:{{ serif }}; font-size:23px; line-height:1.3; font-weight:normal;">
+      <a href="{{ e.url }}" style="color:{{ ink }}; text-decoration:none;">{{ e.title }}</a>
+    </h2>
+    {% if e.authors %}
+    <p style="margin:6px 0 0 0; font-family:{{ sans }}; font-size:14px; line-height:1.5; color:{{ muted }};">{{ e.authors[:6]|join(", ") }}{% if e.authors|length > 6 %} and others{% endif %}</p>
+    {% endif %}
+    <p style="margin:16px 0 0 0; font-family:{{ sans }}; font-size:16px; line-height:1.65; color:{{ ink }};">{{ a.summary }}</p>
+
+    <p style="margin:18px 0 6px 0; font-family:{{ sans }}; font-size:14px; font-weight:bold; color:{{ ink }};">Key takeaways</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    {% for t in a.key_takeaways %}
+      <tr>
+        <td width="18" valign="top" style="padding:3px 0; font-family:{{ sans }}; font-size:15px; line-height:1.55; color:{{ f.color }};">&#9632;</td>
+        <td style="padding:3px 0; font-family:{{ sans }}; font-size:15px; line-height:1.55; color:{{ ink }};">{{ t }}</td>
+      </tr>
+    {% endfor %}
+    </table>
+
+    <p style="margin:18px 0 6px 0; font-family:{{ sans }}; font-size:14px; font-weight:bold; color:{{ ink }};">Why it matters</p>
+    <p style="margin:0; font-family:{{ sans }}; font-size:15px; line-height:1.65; color:{{ ink }};">{{ a.relevance }}</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:18px;">
+      <tr>
+        <td width="3" bgcolor="{{ f.color }}" style="width:3px; background:{{ f.color }};"></td>
+        <td bgcolor="#f6f8fa" style="padding:12px 16px; background:#f6f8fa; font-family:{{ sans }}; font-size:14px; line-height:1.55; color:{{ ink }};">
+          <strong>Classified {{ f.name|lower if a.market_focus != 'Transversal' else 'transversal' }}.</strong> {{ a.market_focus_rationale }}
+        </td>
+      </tr>
+    </table>
+    <p style="margin:14px 0 0 0; font-family:{{ sans }}; font-size:14px;">
+      <a href="{{ e.url }}" style="color:#2c5bb8; text-decoration:underline;">Read the paper</a>
+      {% if a.topics %}<span style="color:{{ muted }};">&nbsp;&nbsp;Topics: {{ a.topics|join(", ") }}</span>{% endif %}
+    </p>
+  </td></tr>
+  {% endfor %}
+
+  {# ---- How this issue was made ---- #}
+  <tr><td style="padding:36px 0 0 0;"></td></tr>
+  <tr><td class="px" bgcolor="{{ mist }}" style="padding:26px 40px 30px 40px; background:{{ mist }}; font-family:{{ sans }}; font-size:13px; line-height:1.6; color:{{ muted }};">
+    <p style="margin:0 0 8px 0; font-size:14px; font-weight:bold; color:{{ ink }};">How this issue was made</p>
+    <p style="margin:0 0 10px 0;">An automated agent screened {{ issue.stats.n_candidates }} new publications from {{ n_sources }} sources ({{ window }}). {{ issue.stats.n_scored }} with a usable abstract were scored for market relevance by a language model, and the {{ entries|length }} above were selected, with at most two papers per source.</p>
+    {% if excluded %}
+    <p style="margin:0 0 10px 0;">Not assessed this cycle:
+      {% for x in excluded %}{{ x.n }} from {{ x.source }} ({{ x.reason }}){{ "; " if not loop.last else "." }}{% endfor %}
+    </p>
+    {% endif %}
+    <p style="margin:0 0 10px 0;">Market focus: <strong style="color:{{ focus.EM.color }};">Emerging markets</strong> for research centred on emerging or developing economies, <strong style="color:{{ focus.DM.color }};">Developed markets</strong> for advanced economies, and <strong style="color:{{ focus.Transversal.color }};">Transversal</strong> for work spanning both or tied to neither.</p>
+    <p style="margin:0 0 10px 0;">Summaries are written by {{ issue.stats.models|join(", ") or "a language model" }} from each paper's title and abstract only, and may contain errors. Check the original paper before relying on a finding.</p>
+    <p style="margin:0;"><a href="{{ site.site_url }}" style="color:#2c5bb8; text-decoration:underline;">Explore every paper screened this month</a></p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

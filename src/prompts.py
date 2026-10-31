@@ -97,3 +97,17 @@ setting or scope;
   "regions": array of the countries/regions the paper studies (empty if none stated);
   "topics": array of 1-3 topic tags (e.g. "Monetary policy", "Inflation", "Trade");
   "confidence": "high" | "medium" | "low" — how well the abstract supports the analysis."""
+
+
+def intro_prompt(papers: list[dict]) -> str:
+    listing = "\n".join(f"- [{p['market_focus']}] {p['title']} ({p['source']}): {p['summary']}"
+                        for p in papers)
+    return f"""Write the editor's note that opens this month's issue of The Research Roundup.
+
+Featured papers:
+{listing}
+
+Return one JSON object: {{"intro": "..."}} where intro is 2-3 sentences (max 70 words)
+naming the one or two themes that connect several of these papers and why they matter
+for markets now. Do not list every paper, do not add facts that are not in the
+summaries, and keep the measured house style."""

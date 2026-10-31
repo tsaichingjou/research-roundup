@@ -5,16 +5,15 @@ journals, central banks and research institutions, and produces a monthly
 HTML newsletter of 5–8 curated papers with plain-language summaries and an
 EM / DM / Transversal market classification.
 
-> **Status: step 2 of 5.** Ingestion works for NBER, BIS, IMF and the top-5
-> journals (AER, Econometrica, JPE, QJE, REStud); the LLM analysis module
-> (screening, selection, summaries, EM/DM/Transversal classification) is in place.
-> The HTML newsletter, dashboard and scheduling are the next milestones.
+> **Status: step 3 of 5.** Ingestion (NBER, BIS, IMF, top-5 journals), LLM
+> analysis, the email-ready newsletter and the interactive explorer are in place.
+> Remaining: central-bank sources and automated monthly publishing to GitHub Pages.
 
 ## Architecture
 
 ```
-sources.yaml ──► fetchers ──► SQLite ──► pre-filter ──► LLM screening ──► selection ──► LLM analysis ──► HTML newsletter
-  (config)     (rss, crossref)  (dedupe)  (no abstract)   (batched score)   (5-8 papers)  (summary, EM/DM)     (todo)
+sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screening ─► selection ─► LLM analysis ─► issue ─► site (docs/)
+  (config)   (rss, crossref) (dedupe) (no abstract)  (batched score)  (5-8 papers) (summary, EM/DM)  (frozen)  newsletter + explorer
 ```
 
 | Path | Role |
@@ -28,6 +27,9 @@ sources.yaml ──► fetchers ──► SQLite ──► pre-filter ──► 
 | `src/llm.py` | Gemini REST client: JSON mode, throttling, back-off on rate limits, model fallback. |
 | `src/prompts.py` | Screening and analysis prompts, including the EM / DM / Transversal definitions. |
 | `src/analysis.py` | Pre-filter → batched screening → selection → deep analysis, all cached in SQLite. |
+| `src/issues.py` | Freezes the selection into a monthly issue with an editor's note; past issues never change. |
+| `src/site.py`, `templates/` | Builds the static site: one email-ready newsletter per issue and the interactive explorer. |
+| `config/site.yaml` | Site title and public URL (used for links inside the emailed newsletter). |
 | `main.py` | Command-line entry point. |
 | `tests/` | Unit tests using saved feed fixtures (no network needed). |
 
@@ -53,6 +55,8 @@ python main.py models                # list Gemini models your key can use
 python main.py check                 # test each configured model and its response time
 python main.py analyse               # screen, select and analyse this month's papers
 python main.py analyse --rewrite     # regenerate write-ups (after a prompt change, or with a stronger model)
+python main.py publish               # analyse, freeze this month's issue, build the site in docs/
+python main.py build                 # rebuild docs/ from the database (no LLM calls)
 python main.py export-labels         # blind, stratified labelling sample -> evaluation/labels.csv
 python main.py evaluate              # compare LLM classification with the human labels
 python main.py evaluate --rerun      # same, re-classifying the sample with the current prompt
@@ -106,6 +110,34 @@ than guessed. All results are cached, so re-running costs no extra calls.
 The model never sees anything but the title, authors and abstract, and is
 instructed not to state findings that are not in them.
 
+## Newsletter and explorer
+
+`python main.py publish` writes the site to `docs/` (served by GitHub Pages):
+
+- **`issues/YYYY-MM.html` — the newsletter.** Built for email as well as the web:
+  table layout and inline styles (Outlook, Gmail and Apple Mail ignore most modern
+  CSS), web-safe fonts, a 640px column that narrows on phones. Each issue opens
+  with an editor's note and a composition strip, one segment per featured paper
+  coloured by market focus, then gives every paper a plain-language summary,
+  three takeaways, why it matters and the classification rationale. A closing
+  "How this issue was made" section states what was screened, which sources
+  could not be assessed and why, and which model wrote the summaries.
+- **`index.html` — the explorer.** Pick any issue, switch between its featured
+  papers and everything screened that month, filter by market focus, source or
+  free text, and open a paper to see its summary, takeaways, rationale,
+  relevance score, topics, regions, the model that wrote it and the abstract.
+  A source-coverage chart and table show, per source, how many papers were
+  screened, how they were classified and how many could not be assessed.
+  The data is embedded in the page, so it also works opened as a local file;
+  the same data is published as `data/site.json`.
+- **Design.** The three market-focus colours (EM ochre, DM blue, Transversal
+  teal) were checked for colour-blind separation, and every tag also carries its
+  text label, so meaning never depends on colour alone. Responsive down to
+  phone width, keyboard-accessible, and without external scripts.
+
+Issues are frozen when published: re-running `publish` in the same month
+replaces that month's issue, but earlier issues are never changed.
+
 ## Evaluating the classification
 
 The EM / DM / Transversal labels are checked against human labels rather than
@@ -130,6 +162,6 @@ Results: see `evaluation/report.txt`.
 
 1. ~~Ingestion pipeline (NBER, BIS, IMF, top-5 journals)~~
 2. ~~LLM analysis module — relevance score, summary, key takeaways, EM/DM/Transversal with rationale~~
-3. Responsive, email-safe HTML newsletter (Jinja2) and interactive dashboard on GitHub Pages
+3. ~~Responsive, email-safe HTML newsletter and interactive explorer~~
 4. Remaining sources: G10 and European central banks, 12 regional Fed banks, BPEA
-5. Weekly/monthly scheduling (GitHub Actions) and sample output
+5. Weekly fetch / monthly publish with GitHub Actions, deployed to GitHub Pages

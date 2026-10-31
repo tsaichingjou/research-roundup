@@ -1,0 +1,9 @@
+# =============================================================================
+# The Research Roundup — published site
+# =============================================================================
+title: The Research Roundup
+tagline: New economics research that matters for markets, selected and summarised each month.
+# Absolute address of the published site. Used for links inside the emailed
+# newsletter (relative links do not work in email clients).
+site_url: https://tsaichingjou.github.io/research-roundup/
+output_dir: docs            # GitHub Pages serves this folder

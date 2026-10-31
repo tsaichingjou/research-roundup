@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ site.title }} — Paper explorer</title>
+<meta name="description" content="{{ site.tagline }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #172033;
+    --muted: #5a6577;
+    --faint: #8792a3;
+    --rule: #d5dbe3;
+    --mist: #eef1f5;
+    --paper: #ffffff;
+    --link: #2c5bb8;
+    --em: #a8680a;  --em-tint: #f7efe3;
+    --dm: #2c5bb8;  --dm-tint: #e8eef9;
+    --tr: #18876b;  --tr-tint: #e3f3ee;
+    --none: #c3cad4;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--mist); color: var(--ink); font: 400 15px/1.55 var(--sans); }
+  a { color: var(--link); }
+  button, select, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ---- header ---- */
+  header.top { background: var(--paper); border-bottom: 1px solid var(--rule); }
+  .top .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding-top: 18px; padding-bottom: 18px; }
+  .brand { font: 600 24px/1.1 var(--serif); margin: 0; letter-spacing: -0.01em; }
+  .brand small { display: block; font: 400 14px/1.4 var(--sans); color: var(--muted); letter-spacing: 0; margin-top: 4px; }
+  .top-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  select { max-width: 100%; border: 1px solid var(--rule); background: var(--paper); border-radius: var(--radius); padding: 8px 32px 8px 12px; appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 17px) 55%, calc(100% - 12px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ink); background: var(--ink); color: #fff; border-radius: var(--radius); padding: 8px 14px; text-decoration: none; font-weight: 600; }
+  .btn:hover { background: #2a3754; }
+
+  /* ---- issue band: the composition strip is the page's signature ---- */
+  .issue { background: var(--paper); border-bottom: 1px solid var(--rule); }
+  .issue .wrap { padding-top: 28px; padding-bottom: 26px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 48px; }
+  .issue h2 { font: 400 34px/1.15 var(--serif); margin: 0; letter-spacing: -0.015em; }
+  .issue .window { color: var(--muted); margin: 6px 0 0; }
+  .issue .intro { margin: 0; font-size: 16px; line-height: 1.65; max-width: 62ch; }
+  .strip-block { grid-column: 1 / -1; }
+  .strip { display: flex; gap: 3px; height: 34px; margin: 0; padding: 0; list-style: none; }
+  .strip li { flex: 1 1 0; display: flex; }
+  .strip button { flex: 1; border: 0; border-radius: 3px; cursor: pointer; position: relative; padding: 0; }
+  .strip button:hover { transform: scaleY(1.18); }
+  .strip button[aria-pressed="true"] { transform: scaleY(1.18); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+  .strip button { transition: transform .15s ease; }
+  .strip-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 10px; color: var(--muted); font-size: 14px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+  .empty-issue { grid-column: 1 / -1; color: var(--muted); }
+
+  /* ---- controls ---- */
+  .controls { padding-top: 22px; padding-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; background: var(--paper); }
+  .seg button { border: 0; background: transparent; padding: 7px 12px; cursor: pointer; color: var(--muted); }
+  .seg button + button { border-left: 1px solid var(--rule); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .chip { border: 1px solid var(--rule); background: var(--paper); border-radius: 999px; padding: 6px 12px 6px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; color: var(--ink); }
+  .chip .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .chip[aria-pressed="false"] { color: var(--faint); background: transparent; }
+  .chip[aria-pressed="false"] .swatch { background: var(--none) !important; }
+  .search { flex: 1 1 220px; min-width: 180px; border: 1px solid var(--rule); border-radius: var(--radius); padding: 8px 12px; background: var(--paper); }
+  .result-count { width: 100%; color: var(--muted); font-size: 14px; margin: 2px 0 0; }
+
+  /* ---- list + detail ---- */
+  .main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; padding-bottom: 40px; }
+  .list { list-style: none; margin: 0; padding: 0; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius); }
+  .list li + li { border-top: 1px solid var(--rule); }
+  .row { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 0 14px; width: 100%; text-align: left; border: 0; background: transparent; padding: 14px 16px 14px 0; cursor: pointer; }
+  .row:hover { background: #f7f9fb; }
+  .row[aria-current="true"] { background: #f1f4f8; }
+  .row .bar { border-radius: 0 2px 2px 0; }
+  .row .t { font: 400 17px/1.35 var(--serif); }
+  .row .m { color: var(--muted); font-size: 13px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .row .s { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .row .s b { display: block; font: 600 18px/1.1 var(--sans); color: var(--ink); }
+  .star { color: var(--ink); font-weight: 600; }
+  .list .none { padding: 28px 20px; color: var(--muted); }
+
+  .detail { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius); padding: 24px 26px 28px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+  .detail h3 { font: 400 25px/1.25 var(--serif); margin: 10px 0 6px; letter-spacing: -0.01em; }
+  .detail h3 a { color: var(--ink); text-decoration: none; }
+  .detail h3 a:hover { text-decoration: underline; }
+  .detail h4 { font-size: 14px; margin: 20px 0 6px; }
+  .detail p { margin: 0; }
+  .detail .meta { color: var(--muted); font-size: 14px; }
+  .detail ul { margin: 0; padding-left: 18px; }
+  .detail li { margin: 4px 0; }
+  .tag { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 600; }
+  .focus-note { margin-top: 18px; padding: 12px 14px; background: #f6f8fa; border-left: 3px solid var(--ink); font-size: 14px; }
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; margin-top: 18px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; }
+  details.abstract { margin-top: 16px; font-size: 14px; }
+  details.abstract summary { cursor: pointer; color: var(--link); }
+  details.abstract p { margin-top: 8px; color: #33405a; }
+  .detail-empty { color: var(--muted); }
+  .close { display: none; }
+
+  /* ---- coverage ---- */
+  .coverage { background: var(--paper); border-top: 1px solid var(--rule); }
+  .coverage .wrap { padding-top: 32px; padding-bottom: 40px; }
+  .coverage h2 { font: 400 26px/1.2 var(--serif); margin: 0 0 4px; }
+  .coverage .sub { color: var(--muted); margin: 0 0 18px; max-width: 75ch; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .chart { display: grid; grid-template-columns: minmax(120px, 210px) minmax(0, 1fr) 44px; gap: 8px 12px; align-items: center; }
+  .chart .lbl { font-size: 14px; text-align: right; }
+  .chart .track { display: flex; gap: 2px; height: 18px; }
+  .chart .seg-bar { height: 100%; border-radius: 0; min-width: 2px; }
+  .chart .seg-bar:first-child { border-radius: 3px 0 0 3px; }
+  .chart .seg-bar:last-child { border-radius: 0 3px 3px 0; }
+  .chart .seg-bar:only-child { border-radius: 3px; }
+  .chart .seg-bar.na { background: repeating-linear-gradient(135deg, #dfe4ea 0 4px, #f2f4f7 4px 8px); }
+  .chart .tot { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .tip { position: fixed; pointer-events: none; background: var(--ink); color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; z-index: 50; display: none; max-width: 260px; }
+  table.cov { width: 100%; border-collapse: collapse; margin-top: 28px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  table.cov th, table.cov td { padding: 8px 10px; border-bottom: 1px solid var(--rule); text-align: right; }
+  table.cov th:first-child, table.cov td:first-child, table.cov th:nth-child(2), table.cov td:nth-child(2) { text-align: left; }
+  table.cov th { font-weight: 600; color: var(--muted); }
+  .table-scroll { overflow-x: auto; }
+
+  footer { color: var(--muted); font-size: 13px; padding: 22px 0 40px; }
+
+  @media (max-width: 900px) {
+    .issue .wrap { grid-template-columns: 1fr; }
+    .main { grid-template-columns: 1fr; }
+    .detail { display: none; }
+    .detail.open { display: block; position: fixed; inset: auto 0 0 0; top: 8vh; max-height: none; border-radius: 12px 12px 0 0; z-index: 40; box-shadow: 0 -8px 30px rgba(23, 32, 51, .18); }
+    .close { display: inline-block; float: right; border: 1px solid var(--rule); background: var(--paper); border-radius: var(--radius); padding: 4px 10px; cursor: pointer; }
+    .chart { grid-template-columns: minmax(84px, 120px) minmax(0, 1fr) 34px; }
+    .issue h2 { font-size: 28px; }
+  }
+  @media (max-width: 520px) {
+    .wrap { padding: 0 16px; }
+    .row .s b { font-size: 16px; }
+    .controls select { flex: 1 1 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { .strip button { transition: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1 class="brand">{{ site.title }}<small>Paper explorer</small></h1>
+    <div class="top-actions">
+      <label class="visually-hidden" for="issue-select">Issue</label>
+      <select id="issue-select"></select>
+      <a class="btn" id="read-link" href="#">Read the newsletter</a>
+    </div>
+  </div>
+</header>
+
+<section class="issue" aria-labelledby="issue-title">
+  <div class="wrap" id="issue-band"></div>
+</section>
+
+<div class="wrap">
+  <div class="controls" role="group" aria-label="Filter papers">
+    <div class="seg" id="scope" role="group" aria-label="Which papers">
+      <button type="button" data-scope="featured" aria-pressed="true">Featured</button>
+      <button type="button" data-scope="screened" aria-pressed="false">All screened</button>
+    </div>
+    <div id="focus-chips" role="group" aria-label="Market focus" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <label class="visually-hidden" for="source-select">Source</label>
+    <select id="source-select"></select>
+    <label class="visually-hidden" for="sort-select">Sort</label>
+    <select id="sort-select">
+      <option value="score">Highest relevance</option>
+      <option value="date">Newest first</option>
+      <option value="title">Title A–Z</option>
+    </select>
+    <label class="visually-hidden" for="q">Search titles, authors and abstracts</label>
+    <input class="search" id="q" type="search" placeholder="Search titles, authors, abstracts">
+    <p class="result-count" id="count" aria-live="polite"></p>
+  </div>
+
+  <div class="main">
+    <ul class="list" id="list" aria-label="Papers"></ul>
+    <aside class="detail" id="detail" aria-live="polite"><p class="detail-empty">Select a paper to see its summary, classification and metadata.</p></aside>
+  </div>
+</div>
+
+<section class="coverage" aria-labelledby="cov-title">
+  <div class="wrap">
+    <h2 id="cov-title">Source coverage</h2>
+    <p class="sub" id="cov-sub"></p>
+    <div class="chart-legend" id="chart-legend"></div>
+    <div class="chart" id="chart" role="img" aria-describedby="cov-table-caption"></div>
+    <div class="table-scroll">
+      <table class="cov" id="cov-table"><caption id="cov-table-caption" class="visually-hidden">Papers per source</caption></table>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><footer id="footer"></footer></div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script type="application/json" id="site-data">{{ data_json|safe }}</script>
+<script>
+(() => {
+  const DATA = JSON.parse(document.getElementById("site-data").textContent);
+  const FOCUS = DATA.focus;
+  const FOCUS_KEYS = ["EM", "DM", "Transversal"];
+  const VAR = { EM: "var(--em)", DM: "var(--dm)", Transversal: "var(--tr)" };
+  const TINT = { EM: "var(--em-tint)", DM: "var(--dm-tint)", Transversal: "var(--tr-tint)" };
+  const issues = DATA.issues;
+  const byUid = Object.fromEntries(DATA.papers.map(p => [p.uid, p]));
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const srcName = id => (DATA.sources[id] || {}).name || id;
+  const shortSrc = id => { const n = srcName(id); const m = n.match(/\(([^)]+)\)$/); return m ? m[1] : n; };
+  const focusLabel = f => f === "Transversal" ? "Transversal" : FOCUS[f].name;
+
+  const state = {
+    issue: issues.length ? issues[0].id : "all",
+    scope: issues.length ? "featured" : "screened",
+    focus: new Set(FOCUS_KEYS), source: "all", sort: "score", q: "", selected: null,
+  };
+
+  // ---------- issue selector ----------
+  const sel = $("issue-select");
+  sel.innerHTML = issues.map(i => `<option value="${i.id}">${esc(i.title)} issue</option>`).join("")
+    + `<option value="all">All issues</option>`;
+  sel.value = state.issue;
+  sel.addEventListener("change", () => { state.issue = sel.value; state.selected = null; render(); });
+
+  // ---------- source selector ----------
+  const srcSel = $("source-select");
+  srcSel.innerHTML = `<option value="all">All sources</option>` + Object.values(DATA.sources)
+    .sort((a, b) => a.name.localeCompare(b.name)).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+  srcSel.addEventListener("change", () => { state.source = srcSel.value; render(); });
+  $("sort-select").addEventListener("change", e => { state.sort = e.target.value; render(); });
+  $("q").addEventListener("input", e => { state.q = e.target.value.trim().toLowerCase(); render(); });
+  $("scope").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.scope = b.dataset.scope; render();
+  });
+
+  // ---------- data helpers ----------
+  const currentIssue = () => issues.find(i => i.id === state.issue);
+  function inWindow(p, issue) {
+    const d = p.fetched_at, pub = p.published;
+    return (d >= issue.stats.window_start && d <= issue.stats.window_end)
+      || (pub && pub >= issue.stats.window_start && pub <= issue.stats.window_end);
+  }
+  function scopePapers() {
+    const issue = currentIssue();
+    if (state.scope === "featured") {
+      if (issue) return issue.paper_uids.map(u => byUid[u]).filter(Boolean);
+      return DATA.papers.filter(p => p.issues.length);
+    }
+    return issue ? DATA.papers.filter(p => inWindow(p, issue)) : DATA.papers;
+  }
+  function filtered(papers) {
+    let out = papers.filter(p =>
+      (p.focus ? state.focus.has(p.focus) : state.focus.size === 3) &&
+      (state.source === "all" || p.source === state.source) &&
+      (!state.q || (p.title + " " + p.authors.join(" ") + " " + (p.abstract || "")).toLowerCase().includes(state.q)));
+    const by = {
+      score: (a, b) => (b.score ?? -1) - (a.score ?? -1) || (b.published || "").localeCompare(a.published || ""),
+      date: (a, b) => (b.published || b.fetched_at).localeCompare(a.published || a.fetched_at),
+      title: (a, b) => a.title.localeCompare(b.title),
+    }[state.sort];
+    if (!(state.scope === "featured" && state.sort === "score" && currentIssue())) out.sort(by);
+    return out;
+  }
+
+  // ---------- issue band ----------
+  function renderIssue() {
+    const issue = currentIssue();
+    const band = $("issue-band");
+    const link = $("read-link");
+    if (!issue) {
+      band.innerHTML = issues.length
+        ? `<div><h2 id="issue-title">All issues</h2><p class="window">${issues.length} issue${issues.length > 1 ? "s" : ""} published, ${DATA.papers.filter(p => p.issues.length).length} papers featured</p></div>`
+        : `<div><h2 id="issue-title">No issue published yet</h2><p class="window">Run <code>python main.py publish</code> to create the first issue. Every screened paper is listed below.</p></div>`;
+      link.style.display = issues.length ? "" : "none";
+      if (issues.length) link.href = `issues/${issues[0].id}.html`, link.textContent = `Read the ${issues[0].title} issue`;
+      return;
+    }
+    link.style.display = ""; link.href = `issues/${issue.id}.html`; link.textContent = "Read the newsletter";
+    const papers = issue.paper_uids.map(u => byUid[u]).filter(Boolean);
+    const counts = Object.fromEntries(FOCUS_KEYS.map(k => [k, papers.filter(p => p.focus === k).length]));
+    band.innerHTML = `
+      <div><h2 id="issue-title">${esc(issue.title)}</h2>
+        <p class="window">Research published ${fmtDate(issue.stats.window_start)} to ${fmtDate(issue.stats.window_end)}.
+        ${papers.length} featured from ${issue.stats.n_candidates} screened.</p></div>
+      <p class="intro">${esc(issue.intro)}</p>
+      <div class="strip-block">
+        <ul class="strip" aria-label="Featured papers, coloured by market focus">
+          ${papers.map(p => `<li><button type="button" data-uid="${p.uid}" style="background:${VAR[p.focus]}"
+              aria-pressed="${state.selected === p.uid}" aria-label="${esc(focusLabel(p.focus))}: ${esc(p.title)}"></button></li>`).join("")}
+        </ul>
+        <div class="strip-legend">${FOCUS_KEYS.filter(k => counts[k]).map(k =>
+          `<span><span class="swatch" style="background:${VAR[k]}"></span>${counts[k]} ${esc(focusLabel(k).toLowerCase())}</span>`).join("")}</div>
+      </div>`;
+    band.querySelectorAll(".strip button").forEach(b => {
+      b.addEventListener("click", () => { state.scope = "featured"; select(b.dataset.uid); render(); });
+      b.addEventListener("mousemove", e => showTip(e, `<b>${esc(focusLabel(byUid[b.dataset.uid].focus))}</b><br>${esc(byUid[b.dataset.uid].title)}`));
+      b.addEventListener("mouseleave", hideTip);
+    });
+  }
+
+  // ---------- focus chips ----------
+  function renderChips(papers) {
+    const n = Object.fromEntries(FOCUS_KEYS.map(k => [k, papers.filter(p => p.focus === k).length]));
+    $("focus-chips").innerHTML = FOCUS_KEYS.map(k => `<button type="button" class="chip" data-focus="${k}" aria-pressed="${state.focus.has(k)}">
+      <span class="swatch" style="background:${VAR[k]}"></span>${esc(focusLabel(k))} <span class="n">${n[k]}</span></button>`).join("");
+    $("focus-chips").querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+      const k = c.dataset.focus;
+      if (state.focus.has(k) && state.focus.size === 1) state.focus = new Set(FOCUS_KEYS);
+      else if (state.focus.size === 3) state.focus = new Set([k]);
+      else state.focus.has(k) ? state.focus.delete(k) : state.focus.add(k);
+      render();
+    }));
+  }
+
+  // ---------- list ----------
+  function renderList(papers) {
+    const list = $("list");
+    if (!papers.length) { list.innerHTML = `<li class="none">No papers match these filters. Clear the search or select more market focus labels.</li>`; return; }
+    list.innerHTML = papers.map(p => {
+      const sameIssue = state.scope === "featured" && currentIssue();
+      const featured = p.issues.length && !sameIssue ? `<span class="star">Featured ${esc(p.issues.map(i => (issues.find(x => x.id === i) || {}).title || i).join(", "))}</span>` : "";
+      const status = p.status === "excluded" ? `<span>Not assessed: ${esc(p.reason)}</span>` : (p.focus ? `<span style="color:${VAR[p.focus]};font-weight:600">${esc(focusLabel(p.focus))}</span>` : "");
+      return `<li><button type="button" class="row" data-uid="${p.uid}" aria-current="${state.selected === p.uid}">
+        <span class="bar" style="background:${p.focus ? VAR[p.focus] : "var(--none)"}"></span>
+        <span><span class="t">${esc(p.title)}</span>
+          <span class="m">${status}<span>${esc(shortSrc(p.source))}</span><span>${fmtDate(p.published || p.fetched_at)}</span>${featured}</span></span>
+        <span class="s">${p.score != null ? `<b>${p.score}</b>of 10` : ""}</span>
+      </button></li>`;
+    }).join("");
+    list.querySelectorAll(".row").forEach(r => r.addEventListener("click", () => { select(r.dataset.uid); render(); }));
+  }
+
+  function select(uid) { state.selected = uid; $("detail").classList.add("open"); }
+
+  // ---------- detail ----------
+  function renderDetail() {
+    const d = $("detail");
+    const p = byUid[state.selected];
+    if (!p) { d.classList.remove("open"); d.innerHTML = `<p class="detail-empty">Select a paper to see its summary, classification and metadata.</p>`; return; }
+    const a = p.analysis;
+    const color = p.focus ? VAR[p.focus] : "var(--muted)";
+    d.innerHTML = `
+      <button type="button" class="close" id="close">Close</button>
+      ${p.focus ? `<span class="tag" style="color:${color};background:${TINT[p.focus]}">${esc(focusLabel(p.focus))}</span>` : ""}
+      <h3><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a></h3>
+      <p class="meta">${esc(p.authors.slice(0, 8).join(", "))}${p.authors.length > 8 ? " and others" : ""}</p>
+      ${a ? `
+        <h4>Summary</h4><p>${esc(a.summary)}</p>
+        <h4>Key takeaways</h4><ul>${a.key_takeaways.map(t => `<li>${esc(t)}</li>`).join("")}</ul>
+        <h4>Why it matters</h4><p>${esc(a.relevance)}</p>
+        <p class="focus-note" style="border-left-color:${color}"><strong>Why ${esc(focusLabel(p.focus).toLowerCase())}:</strong> ${esc(a.market_focus_rationale)}</p>`
+      : p.reason ? `<p class="focus-note" style="border-left-color:${color}"><strong>${p.status === "excluded" ? "Not assessed" : "Screening note"}:</strong> ${esc(p.reason)}</p>` : ""}
+      <dl class="facts">
+        <dt>Source</dt><dd>${esc(srcName(p.source))}</dd>
+        <dt>Published</dt><dd>${fmtDate(p.published) || "Not stated"}</dd>
+        ${p.score != null ? `<dt>Relevance</dt><dd>${p.score} of 10</dd>` : ""}
+        ${a && a.topics && a.topics.length ? `<dt>Topics</dt><dd>${esc(a.topics.join(", "))}</dd>` : p.topic ? `<dt>Topic</dt><dd>${esc(p.topic)}</dd>` : ""}
+        ${a && a.regions && a.regions.length ? `<dt>Regions</dt><dd>${esc(a.regions.join(", "))}</dd>` : ""}
+        ${p.issues.length ? `<dt>Featured in</dt><dd>${p.issues.map(i => { const x = issues.find(y => y.id === i); return `<a href="issues/${i}.html#p-${p.uid}">${esc(x ? x.title : i)}</a>`; }).join(", ")}</dd>` : ""}
+        ${a && a.model ? `<dt>Written by</dt><dd>${esc(a.model)}${a.confidence ? `, ${esc(a.confidence)} confidence` : ""}</dd>` : ""}
+      </dl>
+      ${p.abstract ? `<details class="abstract"><summary>Abstract</summary><p>${esc(p.abstract)}</p></details>` : ""}
+      <p style="margin-top:16px"><a href="${esc(p.url)}" target="_blank" rel="noopener">Read the paper</a></p>`;
+    const c = $("close"); if (c) c.addEventListener("click", () => { state.selected = null; render(); });
+  }
+
+  // ---------- coverage chart + table ----------
+  function renderCoverage() {
+    const issue = currentIssue();
+    const pool = issue ? DATA.papers.filter(p => inWindow(p, issue)) : DATA.papers;
+    const ids = Object.keys(DATA.sources).filter(id => pool.some(p => p.source === id) || (issue && issue.stats.coverage[id]));
+    const rows = ids.map(id => {
+      const ps = pool.filter(p => p.source === id);
+      const r = { id, total: ps.length, na: ps.filter(p => p.status === "excluded").length,
+        pending: ps.filter(p => p.status === "pending").length, featured: ps.filter(p => p.issues.length).length,
+        reasons: [...new Set(ps.filter(p => p.status === "excluded").map(p => p.reason))] };
+      FOCUS_KEYS.forEach(k => r[k] = ps.filter(p => p.status === "scored" && p.focus === k).length);
+      r.scored = FOCUS_KEYS.reduce((s, k) => s + r[k], 0);
+      return r;
+    }).sort((a, b) => b.total - a.total);
+    const max = Math.max(1, ...rows.map(r => r.total));
+    $("cov-sub").textContent = issue
+      ? `Every publication screened for the ${issue.title} issue, by source and market focus. Hatched bars are papers that could not be assessed, usually because the publisher provides no abstract.`
+      : "Every publication in the database, by source and market focus. Hatched bars are papers that could not be assessed, usually because the publisher provides no abstract.";
+    $("chart-legend").innerHTML = FOCUS_KEYS.map(k => `<span><span class="swatch" style="background:${VAR[k]}"></span>${esc(focusLabel(k))}</span>`).join("")
+      + `<span><span class="swatch" style="background:repeating-linear-gradient(135deg,#dfe4ea 0 3px,#f2f4f7 3px 6px);border:1px solid #d5dbe3"></span>Not assessed</span>`;
+    $("chart").innerHTML = rows.map(r => {
+      const segs = FOCUS_KEYS.filter(k => r[k]).map(k =>
+        `<span class="seg-bar" data-tip="${esc(shortSrc(r.id))}: ${r[k]} ${esc(focusLabel(k).toLowerCase())}" style="width:${r[k] / max * 100}%;background:${VAR[k]}"></span>`).join("")
+        + (r.na ? `<span class="seg-bar na" data-tip="${esc(shortSrc(r.id))}: ${r.na} not assessed (${esc(r.reasons.join(", "))})" style="width:${r.na / max * 100}%"></span>` : "");
+      return `<span class="lbl">${esc(shortSrc(r.id))}</span><span class="track">${segs}</span><span class="tot">${r.total}</span>`;
+    }).join("");
+    $("chart").querySelectorAll("[data-tip]").forEach(s => {
+      s.addEventListener("mousemove", e => showTip(e, esc(s.dataset.tip).replace(/^([^:]+):/, "<b>$1</b>:")));
+      s.addEventListener("mouseleave", hideTip);
+    });
+    $("cov-table").innerHTML = `<caption id="cov-table-caption" class="visually-hidden">Papers per source</caption>
+      <thead><tr><th scope="col">Source</th><th scope="col">Type</th><th scope="col">Screened</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Not assessed</th><th scope="col">Featured</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${esc(srcName(r.id))}</td><td>${esc((DATA.sources[r.id].category || "").replace("_", " "))}</td>
+        <td>${r.total}</td>${FOCUS_KEYS.map(k => `<td>${r[k]}</td>`).join("")}<td>${r.na}${r.reasons.length ? ` <span style="color:var(--muted)">(${esc(r.reasons.join(", "))})</span>` : ""}</td><td>${r.featured}</td></tr>`).join("")}</tbody>`;
+  }
+
+  // ---------- tooltip ----------
+  const tip = $("tip");
+  function showTip(e, html) { tip.innerHTML = html; tip.style.display = "block";
+    const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8); tip.style.left = x + "px"; tip.style.top = (e.clientY + 16) + "px"; }
+  function hideTip() { tip.style.display = "none"; }
+
+  // ---------- render ----------
+  function render() {
+    $("scope").querySelectorAll("button").forEach(b => {
+      b.setAttribute("aria-pressed", b.dataset.scope === state.scope);
+      const n = b.dataset.scope === "featured"
+        ? (currentIssue() ? currentIssue().paper_uids.length : DATA.papers.filter(p => p.issues.length).length)
+        : (currentIssue() ? DATA.papers.filter(p => inWindow(p, currentIssue())).length : DATA.papers.length);
+      b.textContent = `${b.dataset.scope === "featured" ? "Featured" : "All screened"} (${n})`;
+    });
+    renderIssue();
+    const base = scopePapers();
+    renderChips(base);
+    const papers = filtered(base);
+    $("count").textContent = `${papers.length} of ${base.length} paper${base.length === 1 ? "" : "s"} shown`;
+    if (state.selected && !papers.some(p => p.uid === state.selected) && window.innerWidth > 900) state.selected = null;
+    if (!state.selected && papers.length && window.innerWidth > 900) state.selected = papers[0].uid;
+    renderList(papers);
+    renderDetail();
+    renderCoverage();
+  }
+
+  $("footer").innerHTML = `Data updated ${fmtDate(DATA.generated_at)}. ${DATA.papers.length} publications in the database from ${Object.keys(DATA.sources).length} configured sources.
+    Summaries and classifications are produced by a language model from titles and abstracts and may contain errors. <a href="data/site.json">Download the data (JSON)</a>.`;
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && $("detail").classList.contains("open") && window.innerWidth <= 900) { state.selected = null; render(); } });
+  render();
+})();
+</script>
+</body>
+</html>

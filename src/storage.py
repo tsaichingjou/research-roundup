@@ -54,6 +54,16 @@ CREATE TABLE IF NOT EXISTS screening (
     screened_at   TEXT NOT NULL
 );
 
+-- Published issues are frozen: later runs never change a past issue.
+CREATE TABLE IF NOT EXISTS issues (
+    id            TEXT PRIMARY KEY,  -- e.g. 2026-10
+    title         TEXT NOT NULL,     -- e.g. October 2026
+    intro         TEXT,
+    paper_uids    TEXT NOT NULL,     -- JSON list, in newsletter order
+    stats         TEXT NOT NULL,     -- JSON: window, candidates, coverage...
+    published_at  TEXT NOT NULL
+);
+
 -- Stage 2: full newsletter analysis for selected papers.
 CREATE TABLE IF NOT EXISTS analysis (
     uid           TEXT PRIMARY KEY REFERENCES papers(uid),
@@ -170,6 +180,25 @@ class Storage:
                      r.get("topic"), r.get("reason"), model, now),
                 )
 
+    def save_issue(self, issue: dict) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO issues (id, title, intro, paper_uids, stats, published_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (issue["id"], issue["title"], issue.get("intro"), json.dumps(issue["paper_uids"]),
+                 json.dumps(issue["stats"], ensure_ascii=False), issue["published_at"]),
+            )
+
+    def get_issues(self) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute("SELECT * FROM issues ORDER BY id DESC").fetchall()
+        return [_issue_dict(r) for r in rows]
+
+    def get_issue(self, issue_id: str) -> dict | None:
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM issues WHERE id = ?", (issue_id,)).fetchone()
+        return _issue_dict(row) if row else None
+
     def get_analysis(self, uid: str) -> dict | None:
         with self._conn() as conn:
             row = conn.execute("SELECT * FROM analysis WHERE uid = ?", (uid,)).fetchone()
@@ -185,6 +214,14 @@ class Storage:
                 (uid, json.dumps(payload, ensure_ascii=False), payload["market_focus"], model,
                  datetime.now(timezone.utc).isoformat()),
             )
+
+
+# -- issues -----------------------------------------------------------------
+def _issue_dict(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["paper_uids"] = json.loads(d["paper_uids"])
+    d["stats"] = json.loads(d["stats"])
+    return d
 
 
 def _paper_dict(row: sqlite3.Row) -> dict:

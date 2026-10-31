@@ -10,6 +10,8 @@ Usage
     python main.py analyse --rewrite      # regenerate the write-ups (e.g. after a prompt change)
     python main.py export-labels          # write a blind labelling sample to evaluation/labels.csv
     python main.py evaluate [--rerun]     # compare LLM classification with your labels
+    python main.py publish                # analyse, freeze this month's issue and build the site
+    python main.py build                  # rebuild the site (docs/) from the database, no LLM calls
 """
 
 from __future__ import annotations
@@ -20,14 +22,18 @@ import logging
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from src.analysis import load_analysis_config, run_analysis  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
 from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
+from src.issues import publish_issue  # noqa: E402
 from src.llm import GeminiClient, LLMError  # noqa: E402
 from src.pipeline import load_config, run_fetch  # noqa: E402
+from src.site import build_site  # noqa: E402
 from src.storage import Storage  # noqa: E402
 
 
@@ -84,6 +90,9 @@ def main() -> int:
     p_ev.add_argument("--rerun", action="store_true",
                       help="Re-classify the labelled papers now with the current prompt")
 
+    sub.add_parser("publish", help="Analyse, freeze this month's issue and build the site")
+    sub.add_parser("build", help="Rebuild the static site from the database")
+
     args = parser.parse_args()
     load_dotenv(ROOT / ".env")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
@@ -100,6 +109,31 @@ def main() -> int:
             print(f"  {r.source_id:<10} {status}")
         print(f"\nTotal papers in database: {storage.count()}")
         return 0 if any(r.ok for r in results) else 1
+
+    site_cfg = yaml.safe_load((ROOT / "config" / "site.yaml").read_text(encoding="utf-8"))
+
+    def build() -> int:
+        res = build_site(storage, config, site_cfg)
+        out = res["out_dir"].relative_to(ROOT)
+        print(f"Site built in {out}/: {len(res['issues'])} issue(s), {res['papers']} papers.")
+        print(f"Open {out}/index.html in a browser to preview it.")
+        return 0
+
+    if args.command == "build":
+        return build()
+
+    if args.command == "publish":
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        try:
+            client, writer = make_client(acfg, "screening"), make_client(acfg, "analysis")
+            report = run_analysis(storage, client, acfg, analysis_client=writer)
+            issue = publish_issue(storage, report, client=writer)
+        except (LLMError, ValueError) as exc:
+            print(f"ERROR: {exc}")
+            return 1
+        print(f"Published the {issue['title']} issue with {len(issue['paper_uids'])} papers.")
+        print(f"Editor's note: {issue['intro']}")
+        return build()
 
     labels_path = ROOT / "evaluation" / "labels.csv"
     if args.command == "export-labels":
