@@ -42,7 +42,7 @@ def load_config(path: str | Path) -> dict:
     if inst_path.exists():
         config["institutions"] = yaml.safe_load(inst_path.read_text(encoding="utf-8"))["institutions"]
     for s in config["sources"]:
-        if s.get("aggregator"):
+        if s.get("aggregator") or s.get("institutions"):
             s["_institutions"] = config["institutions"]
     return config
 
@@ -71,7 +71,7 @@ def run_fetch(config: dict, storage: Storage, only: list[str] | None = None) -> 
             storage.log_fetch(source["id"], "ok", len(papers), n_new)
             log.info("[%s] fetched %d entries, %d new", source["id"], len(papers), n_new)
             result = SourceResult(source["id"], ok=True, n_fetched=len(papers), n_new=n_new)
-            if source.get("aggregator"):
+            if source.get("aggregator") or source.get("institutions"):
                 result.breakdown = dict(Counter(p.source_name for p in papers).most_common())
             results.append(result)
         except Exception as exc:  # one bad source must not stop the others
@@ -98,8 +98,10 @@ def check_sources(config: dict, only: list[str] | None = None) -> list[dict]:
             row.update(ok=True, n=len(papers),
                        newest=max(dates).date().isoformat() if dates else "-",
                        with_abstract=sum(len(p.abstract) >= 200 for p in papers))
-            if source.get("aggregator"):
+            if source.get("aggregator") or source.get("institutions"):
                 row["institutions"] = Counter(p.source_name for p in papers).most_common()
+            if source.get("_diagnostics"):
+                row["diagnostics"] = source["_diagnostics"]
         except Exception as exc:  # report, never stop
             row.update(ok=False, error=str(exc)[:120])
         rows.append(row)

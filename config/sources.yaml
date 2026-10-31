@@ -9,7 +9,7 @@
 #   name      human-readable name shown in the newsletter
 #   category  journal | central_bank | research_institution
 #   group     heading the source is listed under in the newsletter and explorer
-#   type      fetcher to use: rss | crossref
+#   type      fetcher to use: rss | crossref | openalex
 #   aggregator  rss only: the feed mixes many institutions; each item is
 #               attributed using config/institutions.yaml
 #   url       feed URL (rss sources)
@@ -110,15 +110,16 @@ sources:
 
   # --- Brookings Papers on Economic Activity ---------------------------------
   # BPEA appears twice a year (spring and autumn conferences) and has no feed;
-  # issues are read from Crossref, looking back a year so each run sees the
-  # latest edition. Conference drafts that are not yet registered are missed.
+  # Crossref by ISSN returned nothing, so it is read from OpenAlex by ISSN,
+  # looking back a year so each run sees the latest edition.
   - id: bpea
     name: Brookings Papers on Economic Activity (BPEA)
     category: journal
     group: Research institutions
-    type: crossref
+    type: openalex
     issn: 0007-2303
     lookback_days: 365
+    require_abstract: false
     enabled: true
 
   # --- Federal Reserve System: Board + 12 regional banks ----------------------
@@ -229,12 +230,24 @@ sources:
     url: https://fedinprint.org/rss/sanfrancisco.rss
     enabled: true
 
-  # --- G10 central banks + ECB, and European national central banks ---------
-  # The BIS Central Bank Research Hub republishes new research from more than
-  # 50 central banks in one feed, each item linking to the paper on the issuing
-  # bank's website. Items are attributed to that bank via config/institutions.yaml
-  # (which also lists the groups). Fed and BIS items are skipped here because
-  # they are fetched directly above.
+  # --- G10 central banks + ECB, European and other central banks -------------
+  # One OpenAlex query per central bank in config/institutions.yaml: recent
+  # works by that bank's researchers, with abstracts. Chosen over scraping ~50
+  # differently built websites; the BIS Research Hub feed (below) carried only a
+  # few items and lagged by months when tested on 31 Oct 2026.
+  - id: central_banks
+    name: Central banks (via OpenAlex)
+    category: central_bank
+    group: Central banks (via OpenAlex)
+    type: openalex
+    institutions: true
+    include_groups: [G10 central banks and ECB, European national central banks, Other central banks]
+    lookback_days: 60
+    per_institution: 25
+    enabled: true
+
+  # Supplementary: the BIS Central Bank Research Hub republishes central-bank
+  # research in one feed, each item attributed to its bank from the link domain.
   - id: bis_research_hub
     name: BIS Central Bank Research Hub
     category: central_bank

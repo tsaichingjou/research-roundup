@@ -55,7 +55,7 @@ def _date(iso: str | None) -> str:
 def collect(storage: Storage, sources_cfg: dict) -> dict:
     """Assemble everything the site needs into one JSON-serialisable dict."""
     sources = {s["id"]: _source_entry(s["id"], s["name"], s.get("group", "Other"), s["category"])
-               for s in sources_cfg["sources"] if s.get("enabled", True) and not s.get("aggregator")}
+               for s in sources_cfg["sources"] if s.get("enabled", True) and not s.get("aggregator") and not s.get("institutions")}
     for inst in sources_cfg.get("institutions", []):
         if not inst.get("skip"):
             sources[inst["id"]] = _source_entry(inst["id"], inst["name"], inst["group"], "central_bank")

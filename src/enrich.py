@@ -28,6 +28,7 @@ from difflib import SequenceMatcher
 from html.parser import HTMLParser
 
 from src.fetchers.http import FetchError, download
+from src.fetchers.openalex import reconstruct_abstract  # noqa: F401 (re-exported)
 from src.fetchers.rss import clean_text
 from src.models import normalise_title
 from src.storage import Storage
@@ -44,14 +45,6 @@ _GENERIC = re.compile(r"cookie|javascript|subscribe|sign in|log in|this website|
 def doi_of(url: str) -> str | None:
     m = _DOI_RE.search(url or "")
     return m.group(1).rstrip(".").lower() if m else None
-
-
-def reconstruct_abstract(inverted: dict | None) -> str:
-    """OpenAlex stores abstracts as {word: [positions]}; rebuild the text."""
-    if not inverted:
-        return ""
-    words = sorted((pos, w) for w, positions in inverted.items() for pos in positions)
-    return " ".join(w for _, w in words)
 
 
 def titles_match(a: str, b: str) -> bool:

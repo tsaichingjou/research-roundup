@@ -19,9 +19,9 @@ sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screenin
 | Path | Role |
 |---|---|
 | `config/sources.yaml` | Every monitored source, its type and URL. Add or disable sources without touching code. |
-| `config/institutions.yaml` | Central banks reached through the BIS Research Hub feed: domain → institution and group. |
+| `config/institutions.yaml` | The central banks covered: name, group, OpenAlex aliases and web domains. |
 | `src/models.py` | `Paper` data model, stable IDs and title normalisation. |
-| `src/fetchers/` | One module per source *type*: `rss.py` for any RSS/RDF/Atom feed, `crossref.py` for journals and series with an ISSN (Crossref REST API), `http.py` for shared download/retry logic. |
+| `src/fetchers/` | One module per source *type*: `rss.py` for any RSS/RDF/Atom feed, `crossref.py` for journals with an ISSN (Crossref API), `openalex.py` for works by institution or ISSN (OpenAlex API), `http.py` for shared download/retry logic. |
 | `src/storage.py` | SQLite storage with de-duplication by URL **and** by normalised title, plus a `fetch_log` table recording every run. |
 | `src/pipeline.py` | Runs all enabled sources; a failing source is logged and skipped, never stops the run. |
 | `config/analysis.yaml` | LLM models, time window, pre-filter rules, screening batch size and selection rules. |
@@ -73,22 +73,28 @@ python -m pytest -q                  # run tests (no network or API key needed)
 |---|---|---|
 | AER, Econometrica, JPE, QJE, REStud | One source per journal | Crossref API by ISSN (90-day look-back, as journals register DOIs in batches) |
 | NBER | All new working papers | NBER RSS |
-| BPEA | Spring and autumn editions | Crossref API by ISSN (1-year look-back; no feed exists) |
+| BPEA | Spring and autumn editions | OpenAlex API by ISSN (1-year look-back; no feed exists, and Crossref returned nothing) |
 | IMF | IMF Working Papers | Crossref API by ISSN (the IMF RSS endpoint returns 404) |
 | BIS | BIS Working Papers | BIS RSS |
 | 12 Federal Reserve regional banks + Board | One source per bank | Fed in Print RSS (the Federal Reserve System's own catalogue) |
-| G10 central banks | ECB, Bank of Japan, Bank of England, Bank of Canada, Bundesbank, Banque de France, Banca d'Italia, De Nederlandsche Bank, National Bank of Belgium, Riksbank, SNB (Fed via Fed in Print) | BIS Central Bank Research Hub RSS |
-| European national central banks | 25 banks, from Banco de España to Norges Bank and the NBP | BIS Central Bank Research Hub RSS |
+| G10 central banks | ECB, Bank of Japan, Bank of England, Bank of Canada, Bundesbank, Banque de France, Banca d'Italia, De Nederlandsche Bank, National Bank of Belgium, Riksbank, SNB (Fed via Fed in Print) | OpenAlex API, one query per bank; BIS Central Bank Research Hub RSS as a supplement |
+| European national central banks | 25 banks, from Banco de España to Norges Bank and the NBP | Same |
+| Extra: emerging-market central banks | Brazil, Mexico, Chile, Colombia, Peru, Argentina, Korea, South Africa and others | Same |
 
-The BIS Central Bank Research Hub republishes new research from more than 50
-central banks in a single feed, each item linking to the paper on the issuing
-bank's website. The agent attributes every item to that bank from the link's
-domain (`config/institutions.yaml`), so the newsletter credits, say, the Bank of
-Japan rather than the BIS; Fed and BIS items are skipped there because they are
-fetched directly. The Hub also carries emerging-market central banks (Brazil,
-Mexico, Chile, Korea and others), which strengthens EM coverage. One feed for
-dozens of banks is far more reliable than scraping dozens of differently built
-websites; the trade-off is dependence on the Hub's update lag.
+**Central banks.** Each central bank publishes on its own differently built
+website. The first design used the BIS Central Bank Research Hub, which
+republishes research from 50+ central banks in one feed; a live check on
+31 Oct 2026 showed it carried only three items, the newest from 1 August. The
+agent therefore queries **OpenAlex**, a free index of scholarly works, once per
+central bank in `config/institutions.yaml` for recent works by that bank's
+researchers, keeping only records with an abstract. Bank names are matched to
+OpenAlex institution IDs exactly (with aliases such as "Bank of Italy" for Banca
+d'Italia), cached, and can be pinned by ID; `check-sources` lists the match and
+the number of works for every bank. Each paper is credited to its bank, so the
+newsletter cites the Bank of Japan, not an aggregator. The Research Hub stays on
+as a supplement, with items attributed to their bank from the link's domain and
+Fed or BIS items skipped as duplicates. Covering emerging-market central banks
+too strengthens EM coverage.
 
 `python main.py check-sources` fetches every feed without storing anything and
 reports items, how many have usable abstracts, and the newest date — the first

@@ -123,10 +123,10 @@ def main() -> int:
         for r in results:
             status = f"{r.n_fetched:>4} fetched, {r.n_new:>4} new" if r.ok else f"ERROR: {r.error[:60]}"
             print(f"  {r.source_id:<18} {status}")
-            for name, n in list(r.breakdown.items())[:12]:
+            for name, n in list(r.breakdown.items())[:15]:
                 print(f"      {n:>4}  {name}")
-            if len(r.breakdown) > 12:
-                print(f"      ... and {len(r.breakdown) - 12} more institutions")
+            if len(r.breakdown) > 15:
+                print(f"      ... and {len(r.breakdown) - 15} more institutions")
         print(f"\nTotal papers in database: {storage.count()}")
         if not args.no_enrich:
             print_enrichment(run_enrichment(storage, config["settings"],
@@ -145,8 +145,12 @@ def main() -> int:
         for r in rows:
             if r["ok"]:
                 print(f"{r['id']:<18}{'OK':<8}{r['n']:>6}{r['with_abstract']:>10}  {r['newest']}")
-                for name, n in r.get("institutions", [])[:25]:
-                    print(f"{'':<20}{n:>4}  {name}")
+                if r.get("diagnostics"):
+                    for name, msg in r["diagnostics"].items():
+                        print(f"{'':<20}{name[:40]:<40} {msg}")
+                else:
+                    for name, n in r.get("institutions", [])[:25]:
+                        print(f"{'':<20}{n:>4}  {name}")
             else:
                 print(f"{r['id']:<18}{'FAIL':<8}  {r['error']}")
         bad = [r["id"] for r in rows if not r["ok"] or r["n"] == 0]
