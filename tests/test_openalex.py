@@ -32,6 +32,7 @@ INSTITUTIONS = {
 @pytest.fixture
 def api(monkeypatch, tmp_path):
     monkeypatch.setattr(openalex, "CACHE", tmp_path / "ids.json")
+    monkeypatch.setattr(openalex.time, "sleep", lambda s: None)
     calls = []
 
     def fake(url, settings, params=None):
@@ -43,7 +44,7 @@ def api(monkeypatch, tmp_path):
             return json.dumps({"results": [work("ECB paper", "10.2866/1")]}).encode()
         if "institutions.id:I3" in f:
             raise FetchError("HTTP 500")
-        if "issn:0007-2303" in f:
+        if "locations.source.issn:0007-2303|1533-4465" in f:
             return json.dumps({"results": [work("BPEA paper", "10.1353/eca.1")]}).encode()
         return json.dumps({"results": []}).encode()
 
@@ -85,7 +86,7 @@ def test_resolution_is_cached(api):
 
 
 def test_issn_mode_for_bpea(api):
-    papers = openalex.fetch({"id": "bpea", "name": "BPEA", "issn": "0007-2303", "lookback_days": 365}, {})
+    papers = openalex.fetch({"id": "bpea", "name": "BPEA", "issn": ["0007-2303", "1533-4465"], "lookback_days": 365}, {})
     assert [p.title for p in papers] == ["BPEA paper"] and papers[0].source_id == "bpea"
 
 
@@ -93,3 +94,27 @@ def test_all_institutions_failing_raises(api, monkeypatch):
     monkeypatch.setattr(openalex, "download", lambda *a, **k: (_ for _ in ()).throw(FetchError("down")))
     with pytest.raises(FetchError):
         openalex.fetch({"id": "cb", "name": "CB", "institutions": True, "_institutions": INSTS[:2]}, {})
+
+
+def test_name_key_folds_accents_and_never_matches_empty():
+    assert openalex.name_key("Österreichische Nationalbank") == "osterreichische nationalbank"
+    assert openalex.name_key("Banco de España") == openalex.name_key("Banco de Espana")
+    assert openalex.name_key("Τράπεζα της Ελλάδος") == ""
+
+
+def test_download_waits_on_429_then_succeeds(monkeypatch):
+    from src.fetchers import http
+
+    class Resp:
+        def __init__(self, code):
+            self.status_code, self.headers, self.content = code, {"Retry-After": "7"}, b"ok"
+
+        def raise_for_status(self):
+            pass
+
+    seq = iter([Resp(429), Resp(200)])
+    waits = []
+    monkeypatch.setattr(http.requests, "get", lambda *a, **k: next(seq))
+    monkeypatch.setattr(http.time, "sleep", waits.append)
+    assert http.download("https://api.openalex.org/works", {"max_retries": 3}) == b"ok"
+    assert waits == [7.0]

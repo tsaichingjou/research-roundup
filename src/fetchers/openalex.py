@@ -12,7 +12,7 @@ Modes (set in sources.yaml)
   institutions: true   one query per institution in config/institutions.yaml
                        (groups chosen with `include_groups`); each paper is
                        credited to that institution.
-  issn: "0007-2303"    works published in one journal or series (used for BPEA).
+  issn: [print, online]  works published in one journal or series (used for BPEA).
 
 Institution names are resolved to OpenAlex IDs with the /institutions search
 and cached in data/openalex_ids.json; a wrong match can be pinned by adding
@@ -24,10 +24,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import time
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from src.models import normalise_title
 from src.fetchers.http import FetchError, download
 from src.fetchers.rss import clean_text
 from src.models import Paper
@@ -57,8 +59,24 @@ def _params(settings: dict, **extra) -> dict:
     return p
 
 
+_last_call = [0.0]
+
+
 def _get(url: str, settings: dict, **params) -> dict:
+    """GET with polite pacing: OpenAlex rate-limits bursts of requests."""
+    gap = settings.get("openalex_min_interval", 0.5)
+    wait = gap - (time.monotonic() - _last_call[0])
+    if wait > 0:
+        time.sleep(wait)
+    _last_call[0] = time.monotonic()
     return json.loads(download(url, settings, params=_params(settings, **params)))
+
+
+def name_key(name: str) -> str:
+    """Accent-insensitive key for institution names: 'Österreichische' -> 'osterreichische'.
+    Returns '' for names with no Latin letters, which then never match anything."""
+    folded = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", " ", folded.lower()).strip()
 
 
 def _load_cache() -> dict:
@@ -87,7 +105,7 @@ def resolve_institution(inst: dict, settings: dict, cache: dict) -> tuple[str, s
         for r in results:
             candidates = [r.get("display_name", "")] + (r.get("display_name_alternatives") or [])
             # exact match on the normalised name: "Bank of Canada" must not match "Bank of Ghana"
-            if any(normalise_title(c) == normalise_title(n) for c in candidates for n in names):
+            if any(name_key(c) and name_key(c) == name_key(n) for c in candidates for n in names):
                 found = (r["id"].rsplit("/", 1)[-1], r["display_name"])
                 break
         if found:
@@ -125,7 +143,9 @@ def fetch(source: dict, settings: dict) -> list[Paper]:
         base.append("has_abstract:true")
 
     if source.get("issn"):
-        return [p for w in works(base + [f"primary_location.source.issn:{source['issn']}"], settings)
+        # a journal can be indexed under its print or its online ISSN: match either, in any location
+        issns = source["issn"] if isinstance(source["issn"], list) else [source["issn"]]
+        return [p for w in works(base + [f"locations.source.issn:{'|'.join(issns)}"], settings)
                 if (p := _to_paper(w, source["id"], source["name"]))]
 
     # institution mode

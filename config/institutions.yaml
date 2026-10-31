@@ -31,9 +31,9 @@ institutions:
   # --- Other European national central banks --------------------------------
   - {id: bde, name: Banco de España, group: European national central banks, aliases: ["Bank of Spain"], domains: [bde.es], repec: [bde]}
   - {id: bdp, name: Banco de Portugal, group: European national central banks, aliases: ["Bank of Portugal"], domains: [bportugal.pt], repec: [ptu]}
-  - {id: bog, name: Bank of Greece, group: European national central banks, domains: [bankofgreece.gr], repec: [bog]}
+  - {id: bog, name: Bank of Greece, group: European national central banks, aliases: ["Bank of Greece (Greece)", "Central Bank of Greece"], domains: [bankofgreece.gr], repec: [bog]}
   - {id: cbi, name: Central Bank of Ireland, group: European national central banks, domains: [centralbank.ie], repec: [cbi]}
-  - {id: oenb, name: Oesterreichische Nationalbank, group: European national central banks, aliases: ["Austrian National Bank", "Central Bank of Austria"], domains: [oenb.at]}
+  - {id: oenb, name: Oesterreichische Nationalbank, group: European national central banks, aliases: ["Österreichische Nationalbank", "Austrian National Bank", "Central Bank of Austria", "Austrian Central Bank"], domains: [oenb.at]}
   - {id: bof, name: Bank of Finland, group: European national central banks, domains: [bof.fi, suomenpankki.fi]}
   - {id: bcl, name: Banque centrale du Luxembourg, group: European national central banks, aliases: ["Central Bank of Luxembourg"], domains: [bcl.lu]}
   - {id: nbs, name: National Bank of Slovakia, group: European national central banks, domains: [nbs.sk]}

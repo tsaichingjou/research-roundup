@@ -22,6 +22,7 @@
 settings:
   request_timeout_seconds: 20
   max_retries: 3
+  openalex_min_interval: 0.5   # seconds between OpenAlex requests (it rate-limits bursts)
   user_agent: "ResearchRoundupBot/0.1 (economic research monitoring; contact: tsaichingjouinuk@gmail.com)"
   contact_email: tsaichingjouinuk@gmail.com   # sent to Crossref for its "polite pool"
   lookback_days: 30                           # crossref: how far back each run looks
@@ -117,7 +118,7 @@ sources:
     category: journal
     group: Research institutions
     type: openalex
-    issn: 0007-2303
+    issn: [0007-2303, 1533-4465]    # print and online ISSN
     lookback_days: 365
     require_abstract: false
     enabled: true
@@ -230,7 +231,7 @@ sources:
     url: https://fedinprint.org/rss/sanfrancisco.rss
     enabled: true
 
-  # --- G10 central banks + ECB, European and other central banks -------------
+  # --- G10 central banks + ECB, and European national central banks ---------
   # One OpenAlex query per central bank in config/institutions.yaml: recent
   # works by that bank's researchers, with abstracts. Chosen over scraping ~50
   # differently built websites; the BIS Research Hub feed (below) carried only a
@@ -241,8 +242,11 @@ sources:
     group: Central banks (via OpenAlex)
     type: openalex
     institutions: true
-    include_groups: [G10 central banks and ECB, European national central banks, Other central banks]
-    lookback_days: 60
+    # Only the groups the brief asks for. "Other central banks" (EM central banks
+    # such as Brazil or Korea) can be added here for extra EM coverage; it was
+    # left out to stay in scope and within OpenAlex's rate limits.
+    include_groups: [G10 central banks and ECB, European national central banks]
+    lookback_days: 90
     per_institution: 25
     enabled: true
 

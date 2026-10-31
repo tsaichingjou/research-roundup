@@ -28,7 +28,16 @@ def download(url: str, settings: dict, params: dict | None = None) -> bytes:
     for attempt in range(1, retries + 1):
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=timeout)
-            if 400 <= resp.status_code < 500 and resp.status_code != 429:
+            if resp.status_code == 429:
+                # Rate limited: wait as long as the server asks (or 5s, 10s, ...), then retry.
+                wait = _retry_after(resp) or 5.0 * attempt
+                last_error = FetchError(f"{url} returned HTTP 429 (rate limited)")
+                log.warning("Rate limited by %s (attempt %d/%d); waiting %.0fs",
+                            url.split("/")[2], attempt, retries, wait)
+                if attempt < retries:
+                    time.sleep(min(wait, 60))
+                continue
+            if 400 <= resp.status_code < 500:
                 raise FetchError(f"{url} returned HTTP {resp.status_code}")
             resp.raise_for_status()
             return resp.content
@@ -38,3 +47,11 @@ def download(url: str, settings: dict, params: dict | None = None) -> bytes:
             if attempt < retries:
                 time.sleep(2 ** (attempt - 1))
     raise FetchError(f"Giving up on {url}: {last_error}")
+
+
+def _retry_after(resp) -> float | None:
+    value = resp.headers.get("Retry-After", "")
+    try:
+        return float(value)
+    except ValueError:
+        return None

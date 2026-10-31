@@ -71,7 +71,8 @@ python -m pytest -q                  # run tests (no network or API key needed)
 
 | Required in the brief | How it is covered | Channel |
 |---|---|---|
-| AER, Econometrica, JPE, QJE, REStud | One source per journal | Crossref API by ISSN (90-day look-back, as journals register DOIs in batches) |
+| AER, Econometrica, QJE, REStud | One source per journal | Crossref API by ISSN (90-day look-back, as journals register DOIs in batches) |
+| JPE | **Partial**: only papers whose abstract can be recovered (about 40% in testing); see below | Crossref API by ISSN + OpenAlex for abstracts |
 | NBER | All new working papers | NBER RSS |
 | BPEA | Spring and autumn editions | OpenAlex API by ISSN (1-year look-back; no feed exists, and Crossref returned nothing) |
 | IMF | IMF Working Papers | Crossref API by ISSN (the IMF RSS endpoint returns 404) |
@@ -79,7 +80,24 @@ python -m pytest -q                  # run tests (no network or API key needed)
 | 12 Federal Reserve regional banks + Board | One source per bank | Fed in Print RSS (the Federal Reserve System's own catalogue) |
 | G10 central banks | ECB, Bank of Japan, Bank of England, Bank of Canada, Bundesbank, Banque de France, Banca d'Italia, De Nederlandsche Bank, National Bank of Belgium, Riksbank, SNB (Fed via Fed in Print) | OpenAlex API, one query per bank; BIS Central Bank Research Hub RSS as a supplement |
 | European national central banks | 25 banks, from Banco de España to Norges Bank and the NBP | Same |
-| Extra: emerging-market central banks | Brazil, Mexico, Chile, Colombia, Peru, Argentina, Korea, South Africa and others | Same |
+
+**Why JPE is only partly covered.** The brief allows a source to be dropped
+for a cycle when abstracts are unavailable, provided this is documented. JPE
+was kept with partial coverage rather than dropped, for these reasons:
+
+1. JPE's Crossref records carry no abstracts (0 of 25 recent records, against
+   full coverage for AER, Econometrica, QJE and REStud).
+2. The abstracts are public on the journal's site, but its pages block
+   automated requests, and the agent does not try to get around that.
+3. OpenAlex holds abstracts for part of JPE's output: 15 of 39 recent papers
+   in the first run.
+
+So JPE papers with an OpenAlex abstract are screened like any other paper,
+and the rest are listed in the explorer as "not assessed: no abstract
+available" and counted in each newsletter's "How this issue was made" note.
+Missing abstracts are looked up again every week, as OpenAlex keeps adding
+records. The trade-off is that a relevant JPE paper can be missed in the month
+it appears; to drop JPE instead, set `enabled: false` in `config/sources.yaml`.
 
 **Central banks.** Each central bank publishes on its own differently built
 website. The first design used the BIS Central Bank Research Hub, which
@@ -91,10 +109,21 @@ researchers, keeping only records with an abstract. Bank names are matched to
 OpenAlex institution IDs exactly (with aliases such as "Bank of Italy" for Banca
 d'Italia), cached, and can be pinned by ID; `check-sources` lists the match and
 the number of works for every bank. Each paper is credited to its bank, so the
-newsletter cites the Bank of Japan, not an aggregator. The Research Hub stays on
-as a supplement, with items attributed to their bank from the link's domain and
-Fed or BIS items skipped as duplicates. Covering emerging-market central banks
-too strengthens EM coverage.
+newsletter cites the Bank of Japan, not an aggregator. Requests are spaced out
+and rate-limit responses (HTTP 429) are waited out, as OpenAlex throttles
+bursts. The Research Hub stays on as a supplement, with items attributed to
+their bank from the link's domain and Fed or BIS items skipped as duplicates.
+
+Coverage is limited to the groups the brief names (G10 and European central
+banks). `config/institutions.yaml` also lists emerging-market central banks
+(Brazil, Mexico, Korea, South Africa and others); adding `Other central banks`
+to `include_groups` in `sources.yaml` turns them on for extra EM coverage.
+
+**Known gaps from the first live run.** OpenAlex returned no recent works for
+a few banks (for example the Bank of Japan), which usually means their working
+papers are indexed late or without author affiliations. `check-sources` shows
+these per bank, and a bank can be pinned to a specific OpenAlex ID if the name
+match is wrong.
 
 `python main.py check-sources` fetches every feed without storing anything and
 reports items, how many have usable abstracts, and the newest date — the first
