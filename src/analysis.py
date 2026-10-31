@@ -195,6 +195,23 @@ def analyse_paper(paper: dict, client: JSONModel) -> dict:
 
 
 # --- Orchestration ----------------------------------------------------------------
+def run_screening(storage: Storage, client: JSONModel, cfg: dict, now: datetime | None = None) -> dict:
+    """Pre-filter and score every paper in the window not screened yet.
+
+    This is the weekly job: scores accumulate through the month, so the monthly
+    run only has to select and write up. Returns counts for the run."""
+    now = now or datetime.now(timezone.utc)
+    since = (now - timedelta(days=cfg["window"]["days"])).isoformat()
+    screened = storage.get_screening()
+    new = [p for p in storage.candidates(since) if p["uid"] not in screened]
+    kept, excluded = prefilter(new, cfg)
+    storage.save_screening(excluded, model=None)
+    results = screen(kept, client, cfg,
+                     on_batch=lambda res: storage.save_screening(res, model=getattr(client, "model", None)))
+    return {"new": len(new), "excluded": len(excluded), "scored": len(results),
+            "unscored": len(kept) - len(results)}
+
+
 def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
                  now: datetime | None = None, analysis_client: JSONModel | None = None,
                  rewrite: bool = False) -> dict:
@@ -205,17 +222,10 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
     now = now or datetime.now(timezone.utc)
     analysis_client = analysis_client or client
     since = (now - timedelta(days=cfg["window"]["days"])).isoformat()
+
+    # 1-2. pre-filter and screen papers not seen before (also run weekly on its own)
+    run_screening(storage, client, cfg, now)
     candidates = storage.candidates(since)
-    screened = storage.get_screening()
-
-    # 1. pre-filter papers not seen before
-    new = [p for p in candidates if p["uid"] not in screened]
-    kept, excluded = prefilter(new, cfg)
-    storage.save_screening(excluded, model=None)
-
-    # 2. screen what is left
-    screen(kept, client, cfg,
-           on_batch=lambda res: storage.save_screening(res, model=getattr(client, "model", None)))
     screened = storage.get_screening()
 
     # 3. select from everything scored in the window

@@ -249,3 +249,15 @@ def test_rewrite_regenerates_cached_analyses(tmp_path):
     n = len(client.prompts)
     analysis.run_analysis(store, client, CFG, rewrite=True)
     assert len(client.prompts) == n + 3          # 3 write-ups regenerated, no re-screening
+
+
+def test_weekly_screening_then_monthly_reuses_scores(tmp_path):
+    store = make_store(tmp_path, [(f"s{i}", f"Paper {i} [DM] score=8", ABSTRACT) for i in range(3)]
+                       + [("s9", "No abstract [DM] score=8", "")])
+    client = FakeClient()
+    r = analysis.run_screening(store, client, CFG)
+    assert r == {"new": 4, "excluded": 1, "scored": 3, "unscored": 0}
+    n = len(client.prompts)
+    report = analysis.run_analysis(store, client, CFG)
+    assert len(report["entries"]) == 3
+    assert not any(p.startswith("Screen") for p in client.prompts[n:])   # no re-screening

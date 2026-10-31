@@ -5,9 +5,12 @@ journals, central banks and research institutions, and produces a monthly
 HTML newsletter of 5–8 curated papers with plain-language summaries and an
 EM / DM / Transversal market classification.
 
-> **Status: step 4 of 5.** All required source groups are configured, with LLM
-> analysis, the email-ready newsletter and the interactive explorer in place.
-> Remaining: automated weekly screening and monthly publishing to GitHub Pages.
+**Live newsletter and explorer:** <https://tsaichingjou.github.io/research-roundup/>
+(each issue is under `issues/YYYY-MM.html`; the explorer links to it).
+
+The agent runs itself on GitHub Actions: every Monday it fetches and scores the
+week's new publications, and on the 1st of each month it selects 5–8 papers,
+writes them up and publishes the issue to GitHub Pages.
 
 ## Architecture
 
@@ -31,9 +34,56 @@ sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screenin
 | `src/analysis.py` | Pre-filter → batched screening → selection → deep analysis, all cached in SQLite. |
 | `src/issues.py` | Freezes the selection into a monthly issue with an editor's note; past issues never change. |
 | `src/site.py`, `templates/` | Builds the static site: one email-ready newsletter per issue and the interactive explorer. |
-| `config/site.yaml` | Site title and public URL (used for links inside the emailed newsletter). |
+| `config/site.yaml` | Site title, public URL (used for links inside the emailed newsletter), audience line. |
+| `.github/workflows/` | Weekly screening and monthly publishing on GitHub Actions, deployment to GitHub Pages, tests on every push. |
 | `main.py` | Command-line entry point. |
 | `tests/` | Unit tests using saved feed fixtures (no network needed). |
+
+## Running it yourself
+
+```bash
+git clone https://github.com/tsaichingjou/research-roundup.git
+cd research-roundup
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env               # paste a free Gemini API key into .env
+python main.py fetch               # ~550 papers from 23 sources, a few minutes
+python main.py publish             # screen, select, write up, build the site
+open site/index.html               # the explorer; the newsletter is in site/issues/
+```
+
+A full first run makes roughly 70–90 Gemini calls (scoring in batches of 8,
+then 5–8 write-ups), within the free tier. `python -m pytest -q` runs the test
+suite without network access or API keys.
+
+## Deployment and scheduling
+
+`.github/workflows/pipeline.yml` runs the agent on GitHub Actions:
+
+| When | Job | Steps |
+|---|---|---|
+| Mondays 05:23 UTC | Weekly screening | `fetch` (with abstract recovery) → `screen` → `build` |
+| 1st of the month, 06:17 UTC | Monthly issue | `fetch` → `publish` (select, write up, freeze the issue, build) |
+| On demand | Either | "Run workflow" button in the Actions tab |
+
+Each run commits its database (`data/published.db`) and the built site
+(`docs/`) back to the repository, so the next run continues where the last one
+stopped and the latest output can be read straight from GitHub, and then deploys
+`docs/` to GitHub Pages. Scores accumulate during the month, so the monthly run
+only selects and writes up. Runs never overlap (a concurrency group), and the
+scheduled jobs use their own database and site folder so they cannot clash with
+a local copy. `tests.yml` runs the test suite on every push.
+
+Setting up a fork: add the repository secrets `GEMINI_API_KEY` (required) and
+`OPENALEX_API_KEY` (optional), set *Settings → Pages → Source* to
+*GitHub Actions*, then start the workflow once from the Actions tab.
+
+**Weekly vs monthly.** The brief asks the agent to screen publications each
+week and publish a monthly newsletter. The weekly runs do the screening, and the
+explorer's "New this week" view shows what each one found; the newsletter itself
+is monthly. The newsletter HTML is email-ready, so sending it would only need an
+SMTP step in the monthly job; that was left out because the brief asks for an
+email-ready or web-viewable newsletter, not for a distribution list.
 
 ## Setup
 
@@ -59,10 +109,11 @@ python main.py enrich                # recover missing abstracts (also runs auto
 python main.py show --limit 10       # list the latest stored papers
 python main.py models                # list Gemini models your key can use
 python main.py check                 # test each configured model and its response time
+python main.py screen                # weekly job: score new papers, no write-ups
 python main.py analyse               # screen, select and analyse this month's papers
 python main.py analyse --rewrite     # regenerate write-ups (after a prompt change, or with a stronger model)
-python main.py publish               # analyse, freeze this month's issue, build the site in docs/
-python main.py build                 # rebuild docs/ from the database (no LLM calls)
+python main.py publish               # analyse, freeze this month's issue, build the site in site/
+python main.py build                 # rebuild site/ from the database (no LLM calls)
 python main.py export-labels         # blind, stratified labelling sample -> evaluation/labels.csv
 python main.py evaluate              # compare LLM classification with the human labels
 python main.py evaluate --rerun      # same, re-classifying the sample with the current prompt
@@ -203,7 +254,8 @@ instructed not to state findings that are not in them.
 
 ## Newsletter and explorer
 
-`python main.py publish` writes the site to `docs/` (served by GitHub Pages):
+`python main.py publish` builds the site (into `site/` locally; the scheduled
+run builds `docs/` and deploys it to GitHub Pages):
 
 - **`issues/YYYY-MM.html` — the newsletter.** Built for email as well as the web:
   table layout and inline styles (Outlook, Gmail and Apple Mail ignore most modern
@@ -266,4 +318,4 @@ Results: see `evaluation/report.txt`.
 2. ~~LLM analysis module — relevance score, summary, key takeaways, EM/DM/Transversal with rationale~~
 3. ~~Responsive, email-safe HTML newsletter and interactive explorer~~
 4. ~~Remaining sources: G10 and European central banks, 12 regional Fed banks, BPEA~~
-5. Weekly fetch / monthly publish with GitHub Actions, deployed to GitHub Pages
+5. ~~Weekly fetch / monthly publish with GitHub Actions, deployed to GitHub Pages~~

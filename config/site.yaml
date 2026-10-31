@@ -10,4 +10,7 @@ disclaimer: Candidate technical assessment. Not an official Crédit Agricole CIB
 # Absolute address of the published site. Used for links inside the emailed
 # newsletter (relative links do not work in email clients).
 site_url: https://tsaichingjou.github.io/research-roundup/
-output_dir: docs            # GitHub Pages serves this folder
+# Local builds go to site/ (git-ignored). The scheduled GitHub Actions run builds
+# into docs/ instead (RR_SITE_DIR=docs), commits it as the sample output and
+# deploys it to GitHub Pages.
+output_dir: site

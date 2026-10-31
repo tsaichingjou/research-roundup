@@ -8,6 +8,7 @@ Usage
     python main.py show --limit 10        # list the most recent stored papers
     python main.py models                 # list Gemini models available to your API key
     python main.py check                  # test each configured model and its response time
+    python main.py screen                 # weekly job: score new papers, no write-ups
     python main.py analyse                # screen, select and analyse this month's papers
     python main.py analyse --rewrite      # regenerate the write-ups (e.g. after a prompt change)
     python main.py export-labels          # write a blind labelling sample to evaluation/labels.csv
@@ -21,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -29,7 +31,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from src.analysis import load_analysis_config, run_analysis  # noqa: E402
+from src.analysis import load_analysis_config, run_analysis, run_screening  # noqa: E402
 from src.enrich import run_enrichment  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
 from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
@@ -97,6 +99,7 @@ def main() -> int:
 
     sub.add_parser("models", help="List Gemini models available to your API key")
     sub.add_parser("check", help="Test each configured Gemini model")
+    sub.add_parser("screen", help="Weekly job: pre-filter and score new papers (no write-ups)")
     p_an = sub.add_parser("analyse", aliases=["analyze"], help="Screen, select and analyse papers")
     p_an.add_argument("--rewrite", action="store_true",
                       help="Regenerate the write-ups of the selected papers")
@@ -116,7 +119,9 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
 
     config = load_config(args.config)
-    storage = Storage(ROOT / config["settings"]["database_path"])
+    # The scheduled GitHub Actions runs use their own database and site folder
+    # (RR_DATABASE_PATH, RR_SITE_DIR) so they never clash with a local copy.
+    storage = Storage(ROOT / os.environ.get("RR_DATABASE_PATH", config["settings"]["database_path"]))
 
     if args.command == "fetch":
         results = run_fetch(config, storage, only=args.only)
@@ -164,7 +169,8 @@ def main() -> int:
 
     def build() -> int:
         selection = load_analysis_config(ROOT / "config" / "analysis.yaml")["selection"]
-        res = build_site(storage, config, site_cfg, selection=selection)
+        out_dir = ROOT / os.environ.get("RR_SITE_DIR", site_cfg.get("output_dir", "site"))
+        res = build_site(storage, config, site_cfg, out_dir=out_dir, selection=selection)
         out = res["out_dir"].relative_to(ROOT)
         print(f"Site built in {out}/: {len(res['issues'])} issue(s), {res['papers']} papers.")
         print(f"Open {out}/index.html in a browser to preview it.")
@@ -210,6 +216,17 @@ def main() -> int:
         print(report)
         (ROOT / "evaluation" / "report.txt").write_text(report + "\n", encoding="utf-8")
         print("\nSaved to evaluation/report.txt")
+        return 0
+
+    if args.command == "screen":
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        try:
+            r = run_screening(storage, make_client(acfg, "screening"), acfg)
+        except LLMError as exc:
+            print(f"ERROR: {exc}")
+            return 1
+        print(f"\nScreening: {r['new']} new papers, {r['scored']} scored, {r['excluded']} excluded"
+              + (f", {r['unscored']} left for the next run" if r["unscored"] else ""))
         return 0
 
     if args.command in ("models", "check", "analyse", "analyze"):

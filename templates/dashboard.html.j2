@@ -187,6 +187,7 @@
     <div class="seg" id="scope" role="group" aria-label="Which papers">
       <button type="button" data-scope="featured" aria-pressed="true">In the newsletter</button>
       <button type="button" data-scope="screened" aria-pressed="false">All screened</button>
+      <button type="button" data-scope="week" aria-pressed="false">New this week</button>
     </div>
     <div id="focus-chips" role="group" aria-label="Market focus" style="display:flex;gap:8px;flex-wrap:wrap"></div>
     <label class="visually-hidden" for="source-select">Source</label>
@@ -278,7 +279,12 @@
     return (d >= issue.stats.window_start && d <= issue.stats.window_end)
       || (pub && pub >= issue.stats.window_start && pub <= issue.stats.window_end);
   }
+  // "New this week": papers first seen in the 7 days before the latest data update.
+  const WEEK_START = new Date(new Date(DATA.generated_at).getTime() - 7 * 864e5).toISOString();
+  const isNewThisWeek = p => p.fetched_at >= WEEK_START;
+
   function scopePapers() {
+    if (state.scope === "week") return DATA.papers.filter(isNewThisWeek);
     const issue = currentIssue();
     if (state.scope === "featured") {
       if (issue) return issue.paper_uids.map(u => byUid[u]).filter(Boolean);
@@ -471,8 +477,10 @@
       b.setAttribute("aria-pressed", b.dataset.scope === state.scope);
       const n = b.dataset.scope === "featured"
         ? (currentIssue() ? currentIssue().paper_uids.length : DATA.papers.filter(p => p.issues.length).length)
+        : b.dataset.scope === "week" ? DATA.papers.filter(isNewThisWeek).length
         : (currentIssue() ? DATA.papers.filter(p => inWindow(p, currentIssue())).length : DATA.papers.length);
-      b.textContent = `${b.dataset.scope === "featured" ? "In the newsletter" : "All screened"} (${n})`;
+      const label = { featured: "In the newsletter", screened: "All screened", week: "New this week" }[b.dataset.scope];
+      b.textContent = `${label} (${n})`;
     });
     renderIssue();
     const base = scopePapers();

@@ -1,0 +1,103 @@
+# The Research Roundup — scheduled pipeline
+#
+#   Weekly  (Mondays 05:23 UTC):   fetch new papers, recover abstracts, score them
+#   Monthly (1st, 06:17 UTC):      fetch, select 5-8 papers, write them up, publish the issue
+#
+# Each run commits its database (data/published.db) and the built site (docs/)
+# back to the repository, then deploys docs/ to GitHub Pages.
+# Secrets: GEMINI_API_KEY (required), OPENALEX_API_KEY (optional, raises OpenAlex's budget).
+
+name: Research Roundup pipeline
+
+on:
+  schedule:
+    - cron: "23 5 * * 1"     # weekly screening
+    - cron: "17 6 1 * *"     # monthly issue
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "weekly = fetch and score; monthly = fetch, write up and publish the issue"
+        type: choice
+        options: [weekly, monthly]
+        default: monthly
+
+concurrency:
+  group: research-roundup-pipeline     # never two runs writing the database at once
+  cancel-in-progress: false
+
+env:
+  RR_DATABASE_PATH: data/published.db
+  RR_SITE_DIR: docs
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Decide weekly or monthly
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "17 6 1 * *" ]; then
+            echo "mode=monthly" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=weekly" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch new papers and recover missing abstracts
+        run: python main.py fetch
+
+      - name: Weekly — score new papers
+        if: steps.mode.outputs.mode == 'weekly'
+        run: |
+          python main.py screen
+          python main.py build
+
+      - name: Monthly — select, write up and publish the issue
+        if: steps.mode.outputs.mode == 'monthly'
+        run: python main.py publish
+
+      - name: Commit database and site
+        run: |
+          git config user.name "research-roundup-bot"
+          git config user.email "research-roundup-bot@users.noreply.github.com"
+          git add -f data/published.db docs
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+          else
+            git commit -m "Pipeline: ${{ steps.mode.outputs.mode }} run $(date -u +%Y-%m-%d)"
+            git pull --rebase
+            git push
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: run
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
