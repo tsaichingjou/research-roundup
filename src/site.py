@@ -9,6 +9,7 @@ Output (default `docs/`, served by GitHub Pages):
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,25 @@ FOCUS = {
 }
 
 
+GROUP_ORDER = ["Top-5 economics journals", "Research institutions", "Federal Reserve System",
+               "G10 central banks and ECB", "European national central banks", "Other central banks"]
+
+
+def short_name(name: str) -> str:
+    """Compact label for charts and lists."""
+    m = re.search(r"\(([^)]+)\)$", name)
+    if m:
+        return m.group(1)
+    if name == "Board of Governors of the Federal Reserve System":
+        return "Fed Board"
+    return name.replace("Federal Reserve Bank of ", "Fed ")
+
+
+def _source_entry(sid: str, name: str, group: str, category: str) -> dict:
+    return {"id": sid, "name": name, "short": short_name(name), "group": group, "category": category,
+            "group_rank": GROUP_ORDER.index(group) if group in GROUP_ORDER else len(GROUP_ORDER)}
+
+
 def _date(iso: str | None) -> str:
     if not iso:
         return ""
@@ -34,8 +54,11 @@ def _date(iso: str | None) -> str:
 
 def collect(storage: Storage, sources_cfg: dict) -> dict:
     """Assemble everything the site needs into one JSON-serialisable dict."""
-    sources = {s["id"]: {"id": s["id"], "name": s["name"], "category": s["category"]}
-               for s in sources_cfg["sources"] if s.get("enabled", True)}
+    sources = {s["id"]: _source_entry(s["id"], s["name"], s.get("group", "Other"), s["category"])
+               for s in sources_cfg["sources"] if s.get("enabled", True) and not s.get("aggregator")}
+    for inst in sources_cfg.get("institutions", []):
+        if not inst.get("skip"):
+            sources[inst["id"]] = _source_entry(inst["id"], inst["name"], inst["group"], "central_bank")
     screening = storage.get_screening()
     issues = storage.get_issues()
     featured_in: dict[str, list[str]] = {}
@@ -45,8 +68,8 @@ def collect(storage: Storage, sources_cfg: dict) -> dict:
 
     papers = []
     for p in storage.all_papers():
-        sources.setdefault(p["source_id"], {"id": p["source_id"], "name": p["source_name"],
-                                            "category": "other"})
+        sources.setdefault(p["source_id"], _source_entry(p["source_id"], p["source_name"],
+                                                         "Other central banks", "central_bank"))
         s = screening.get(p["uid"], {})
         a = storage.get_analysis(p["uid"]) if p["uid"] in featured_in else None
         papers.append({

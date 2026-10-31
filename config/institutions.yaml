@@ -1,0 +1,77 @@
+# =============================================================================
+# Central banks and institutions reached through aggregated feeds
+# -----------------------------------------------------------------------------
+# The BIS Central Bank Research Hub publishes, in one feed, new research from
+# dozens of central banks; each item links to the paper on the issuing bank's
+# own website. A paper is attributed to the institution whose domain matches
+# that link (or, failing that, whose RePEc archive code appears in it).
+#
+# group: how the institution is presented in the newsletter and explorer.
+# =============================================================================
+
+institutions:
+  # --- G10 central banks and the ECB ----------------------------------------
+  # (The Federal Reserve Board, the US member of the G10, is fetched directly
+  #  from Fed in Print together with the 12 regional banks.)
+  - {id: ecb, name: European Central Bank, group: G10 central banks and ECB, domains: [ecb.europa.eu], repec: [ecb]}
+  - {id: boj, name: Bank of Japan, group: G10 central banks and ECB, domains: [boj.or.jp]}
+  - {id: boe, name: Bank of England, group: G10 central banks and ECB, domains: [bankofengland.co.uk], repec: [boe]}
+  - {id: boc, name: Bank of Canada, group: G10 central banks and ECB, domains: [bankofcanada.ca], repec: [bca]}
+  - {id: buba, name: Deutsche Bundesbank, group: G10 central banks and ECB, domains: [bundesbank.de]}
+  - {id: bdf, name: Banque de France, group: G10 central banks and ECB, domains: [banque-france.fr], repec: [bfr]}
+  - {id: bdi, name: Banca d'Italia, group: G10 central banks and ECB, domains: [bancaditalia.it], repec: [bdi]}
+  - {id: dnb, name: De Nederlandsche Bank, group: G10 central banks and ECB, domains: [dnb.nl], repec: [dnb]}
+  - {id: nbb, name: National Bank of Belgium, group: G10 central banks and ECB, domains: [nbb.be], repec: [nbb]}
+  - {id: riksbank, name: Sveriges Riksbank, group: G10 central banks and ECB, domains: [riksbank.se]}
+  - {id: snb, name: Swiss National Bank, group: G10 central banks and ECB, domains: [snb.ch], repec: [snb]}
+
+  # --- Other European national central banks --------------------------------
+  - {id: bde, name: Banco de España, group: European national central banks, domains: [bde.es], repec: [bde]}
+  - {id: bdp, name: Banco de Portugal, group: European national central banks, domains: [bportugal.pt], repec: [ptu]}
+  - {id: bog, name: Bank of Greece, group: European national central banks, domains: [bankofgreece.gr], repec: [bog]}
+  - {id: cbi, name: Central Bank of Ireland, group: European national central banks, domains: [centralbank.ie], repec: [cbi]}
+  - {id: oenb, name: Oesterreichische Nationalbank, group: European national central banks, domains: [oenb.at]}
+  - {id: bof, name: Bank of Finland, group: European national central banks, domains: [bof.fi, suomenpankki.fi]}
+  - {id: bcl, name: Banque centrale du Luxembourg, group: European national central banks, domains: [bcl.lu]}
+  - {id: nbs, name: National Bank of Slovakia, group: European national central banks, domains: [nbs.sk]}
+  - {id: bsi, name: Bank of Slovenia, group: European national central banks, domains: [bsi.si]}
+  - {id: eestipank, name: Eesti Pank, group: European national central banks, domains: [eestipank.ee]}
+  - {id: lb, name: Bank of Lithuania, group: European national central banks, domains: [lb.lt, lb.lt]}
+  - {id: bol, name: Latvijas Banka, group: European national central banks, domains: [bank.lv, makroekonomika.lv]}
+  - {id: cbm, name: Central Bank of Malta, group: European national central banks, domains: [centralbankmalta.org]}
+  - {id: cbc, name: Central Bank of Cyprus, group: European national central banks, domains: [centralbank.cy]}
+  - {id: hnb, name: Croatian National Bank, group: European national central banks, domains: [hnb.hr]}
+  - {id: norges, name: Norges Bank, group: European national central banks, domains: [norges-bank.no], repec: [bno]}
+  - {id: dn, name: Danmarks Nationalbank, group: European national central banks, domains: [nationalbanken.dk]}
+  - {id: cnb, name: Czech National Bank, group: European national central banks, domains: [cnb.cz], repec: [cnb]}
+  - {id: nbp, name: Narodowy Bank Polski, group: European national central banks, domains: [nbp.pl], repec: [nbp]}
+  - {id: mnb, name: Magyar Nemzeti Bank, group: European national central banks, domains: [mnb.hu], repec: [mnb]}
+  - {id: bnr, name: National Bank of Romania, group: European national central banks, domains: [bnr.ro]}
+  - {id: bnb, name: Bulgarian National Bank, group: European national central banks, domains: [bnb.bg]}
+  - {id: cbi_is, name: Central Bank of Iceland, group: European national central banks, domains: [cb.is, sedlabanki.is]}
+  - {id: tcmb, name: Central Bank of the Republic of Türkiye, group: European national central banks, domains: [tcmb.gov.tr]}
+  - {id: cbr, name: Bank of Russia, group: European national central banks, domains: [cbr.ru]}
+
+  # --- Other central banks (useful extra coverage, notably for EM) -----------
+  - {id: rba, name: Reserve Bank of Australia, group: Other central banks, domains: [rba.gov.au], repec: [rba]}
+  - {id: rbnz, name: Reserve Bank of New Zealand, group: Other central banks, domains: [rbnz.govt.nz]}
+  - {id: boi, name: Bank of Israel, group: Other central banks, domains: [boi.org.il]}
+  - {id: bok, name: Bank of Korea, group: Other central banks, domains: [bok.or.kr]}
+  - {id: hkma, name: Hong Kong Monetary Authority, group: Other central banks, domains: [hkma.gov.hk]}
+  - {id: mas, name: Monetary Authority of Singapore, group: Other central banks, domains: [mas.gov.sg]}
+  - {id: sbp, name: State Bank of Pakistan, group: Other central banks, domains: [sbp.org.pk]}
+  - {id: sarb, name: South African Reserve Bank, group: Other central banks, domains: [resbank.co.za]}
+  - {id: bcb, name: Banco Central do Brasil, group: Other central banks, domains: [bcb.gov.br]}
+  - {id: banxico, name: Banco de México, group: Other central banks, domains: [banxico.org.mx]}
+  - {id: bcch, name: Banco Central de Chile, group: Other central banks, domains: [bcentral.cl]}
+  - {id: banrep, name: Banco de la República (Colombia), group: Other central banks, domains: [banrep.gov.co]}
+  - {id: bcrp, name: Banco Central de Reserva del Perú, group: Other central banks, domains: [bcrp.gob.pe]}
+  - {id: bcra, name: Banco Central de la República Argentina, group: Other central banks, domains: [bcra.gob.ar]}
+  - {id: esrb, name: European Systemic Risk Board, group: Other central banks, domains: [esrb.europa.eu]}
+
+  # --- Covered directly by their own sources: skipped in aggregated feeds ----
+  - {id: _fed, name: Federal Reserve (covered via Fed in Print), skip: true,
+     domains: [federalreserve.gov, newyorkfed.org, bostonfed.org, philadelphiafed.org, clevelandfed.org,
+               richmondfed.org, atlantafed.org, chicagofed.org, stlouisfed.org, minneapolisfed.org,
+               kansascityfed.org, dallasfed.org, frbsf.org, fedinprint.org], repec: [fip]}
+  - {id: _bis, name: BIS (covered via BIS Working Papers), skip: true, domains: [bis.org]}

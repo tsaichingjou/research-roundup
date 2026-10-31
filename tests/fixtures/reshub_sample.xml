@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Central Bank Research Hub</title><link>https://www.bis.org</link>
+<item><title>Monetary policy and euro area bank lending</title><link>https://www.ecb.europa.eu/pub/pdf/scpwps/ecb.wp3100.en.pdf</link><description>ECB paper.</description></item>
+<item><title>Inflation expectations of Japanese firms</title><link>https://www.boj.or.jp/en/research/wps_rev/wps_2026/wp26e10.htm</link><description>BoJ paper.</description></item>
+<item><title>A FEDS paper also in Fed in Print</title><link>https://www.federalreserve.gov/econres/feds/2026001pap.pdf</link><description>Fed.</description></item>
+<item><title>Bank of Canada staff paper via RePEc</title><link>https://ideas.repec.org/p/bca/bocawp/26-41.html</link><description>BoC.</description></item>
+<item><title>A paper from an unmapped bank</title><link>https://www.newbank.example.org/wp1.pdf</link><description>?</description></item>
+</channel></rss>

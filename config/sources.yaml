@@ -8,7 +8,10 @@
 #   id        unique short key, stored with every paper
 #   name      human-readable name shown in the newsletter
 #   category  journal | central_bank | research_institution
+#   group     heading the source is listed under in the newsletter and explorer
 #   type      fetcher to use: rss | crossref
+#   aggregator  rss only: the feed mixes many institutions; each item is
+#               attributed using config/institutions.yaml
 #   url       feed URL (rss sources)
 #   issn      journal ISSN (crossref sources)
 #   lookback_days  crossref: override the global look-back window
@@ -29,6 +32,7 @@ sources:
   - id: nber
     name: National Bureau of Economic Research (NBER)
     category: research_institution
+    group: Research institutions
     type: rss
     url: https://www.nber.org/rss/new.xml
     enabled: true
@@ -37,6 +41,7 @@ sources:
   - id: bis
     name: Bank for International Settlements (BIS)
     category: research_institution
+    group: Research institutions
     type: rss
     url: https://www.bis.org/doclist/wppubls.rss
     enabled: true
@@ -45,6 +50,7 @@ sources:
   - id: imf
     name: International Monetary Fund (IMF)
     category: research_institution
+    group: Research institutions
     type: crossref
     issn: 1018-5941
     enabled: true
@@ -60,6 +66,7 @@ sources:
   - id: aer
     name: American Economic Review
     category: journal
+    group: Top-5 economics journals
     type: crossref
     issn: 0002-8282
     lookback_days: 90
@@ -68,6 +75,7 @@ sources:
   - id: ecta
     name: Econometrica
     category: journal
+    group: Top-5 economics journals
     type: crossref
     issn: 0012-9682
     lookback_days: 90
@@ -76,6 +84,7 @@ sources:
   - id: jpe
     name: Journal of Political Economy
     category: journal
+    group: Top-5 economics journals
     type: crossref
     issn: 0022-3808
     lookback_days: 90
@@ -84,6 +93,7 @@ sources:
   - id: qje
     name: Quarterly Journal of Economics
     category: journal
+    group: Top-5 economics journals
     type: crossref
     issn: 0033-5533
     lookback_days: 90
@@ -92,18 +102,144 @@ sources:
   - id: restud
     name: Review of Economic Studies
     category: journal
+    group: Top-5 economics journals
     type: crossref
     issn: 0034-6527
     lookback_days: 90
     enabled: true
 
-  # --- Planned (step 4) -------------------------------------------------------
+  # --- Brookings Papers on Economic Activity ---------------------------------
+  # BPEA appears twice a year (spring and autumn conferences) and has no feed;
+  # issues are read from Crossref, looking back a year so each run sees the
+  # latest edition. Conference drafts that are not yet registered are missed.
+  - id: bpea
+    name: Brookings Papers on Economic Activity (BPEA)
+    category: journal
+    group: Research institutions
+    type: crossref
+    issn: 0007-2303
+    lookback_days: 365
+    enabled: true
+
+  # --- Federal Reserve System: Board + 12 regional banks ----------------------
+  # Fed in Print is the Federal Reserve System's own catalogue of its
+  # publications, with one feed per bank. Feeds also carry speeches and
+  # articles; items without an abstract are excluded at the analysis stage.
+  - id: fed_board
+    name: Board of Governors of the Federal Reserve System
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/board.rss
+    enabled: true
+
+  - id: fed_atlanta
+    name: Federal Reserve Bank of Atlanta
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/atlanta.rss
+    enabled: true
+
+  - id: fed_boston
+    name: Federal Reserve Bank of Boston
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/boston.rss
+    enabled: true
+
+  - id: fed_chicago
+    name: Federal Reserve Bank of Chicago
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/chicago.rss
+    enabled: true
+
+  - id: fed_cleveland
+    name: Federal Reserve Bank of Cleveland
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/cleveland.rss
+    enabled: true
+
+  - id: fed_dallas
+    name: Federal Reserve Bank of Dallas
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/dallas.rss
+    enabled: true
+
+  - id: fed_kansascity
+    name: Federal Reserve Bank of Kansas City
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/kansascity.rss
+    enabled: true
+
+  - id: fed_minneapolis
+    name: Federal Reserve Bank of Minneapolis
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/minneapolis.rss
+    enabled: true
+
+  - id: fed_newyork
+    name: Federal Reserve Bank of New York
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/newyork.rss
+    enabled: true
+
+  - id: fed_philadelphia
+    name: Federal Reserve Bank of Philadelphia
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/philadelphia.rss
+    enabled: true
+
+  - id: fed_richmond
+    name: Federal Reserve Bank of Richmond
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/richmond.rss
+    enabled: true
+
+  - id: fed_stlouis
+    name: Federal Reserve Bank of St. Louis
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/stlouis.rss
+    enabled: true
+
+  - id: fed_sanfrancisco
+    name: Federal Reserve Bank of San Francisco
+    category: central_bank
+    group: Federal Reserve System
+    type: rss
+    url: https://fedinprint.org/rss/sanfrancisco.rss
+    enabled: true
+
+  # --- G10 central banks + ECB, and European national central banks ---------
+  # The BIS Central Bank Research Hub republishes new research from more than
+  # 50 central banks in one feed, each item linking to the paper on the issuing
+  # bank's website. Items are attributed to that bank via config/institutions.yaml
+  # (which also lists the groups). Fed and BIS items are skipped here because
+  # they are fetched directly above.
   - id: bis_research_hub
     name: BIS Central Bank Research Hub
     category: central_bank
+    group: Central banks (via BIS Research Hub)
     type: rss
     url: https://www.bis.org/doclist/reshub_papers.rss
-    enabled: false
-    notes: >
-      Aggregates new research papers from central banks worldwide. Candidate
-      shortcut for covering many G10 / European central banks with one feed.
+    aggregator: true
+    enabled: true

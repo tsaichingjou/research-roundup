@@ -3,6 +3,7 @@
 Usage
     python main.py fetch                  # fetch all enabled sources
     python main.py fetch --only nber bis  # fetch selected sources
+    python main.py check-sources          # test every source feed without storing anything
     python main.py show --limit 10        # list the most recent stored papers
     python main.py models                 # list Gemini models available to your API key
     python main.py check                  # test each configured model and its response time
@@ -32,7 +33,7 @@ from src.env import load_dotenv  # noqa: E402
 from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
 from src.issues import publish_issue  # noqa: E402
 from src.llm import GeminiClient, LLMError  # noqa: E402
-from src.pipeline import load_config, run_fetch  # noqa: E402
+from src.pipeline import check_sources, load_config, run_fetch  # noqa: E402
 from src.site import build_site  # noqa: E402
 from src.storage import Storage  # noqa: E402
 
@@ -51,7 +52,7 @@ def print_analysis(report: dict) -> None:
     print("-" * 70)
     for src, c in report["coverage"].items():
         extra = ", ".join(f"{k} {v}" for k, v in c.items() if k.startswith("excluded"))
-        print(f"  {src:<8} {c.get('candidates', 0):>4} candidates, {c.get('scored', 0):>4} scored"
+        print(f"  {src:<18} {c.get('candidates', 0):>4} candidates, {c.get('scored', 0):>4} scored"
               + (f"  ({extra})" if extra else ""))
     print(f"\nSelected for this issue: {len(report['entries'])}")
     print("=" * 70)
@@ -73,6 +74,9 @@ def main() -> int:
 
     p_fetch = sub.add_parser("fetch", help="Fetch new papers from enabled sources")
     p_fetch.add_argument("--only", nargs="+", help="Source ids to fetch")
+
+    p_chk = sub.add_parser("check-sources", help="Test every source feed without storing anything")
+    p_chk.add_argument("--only", nargs="+", help="Source ids to check")
 
     p_show = sub.add_parser("show", help="Show most recent stored papers")
     p_show.add_argument("--limit", type=int, default=10)
@@ -106,9 +110,29 @@ def main() -> int:
         print("-" * 60)
         for r in results:
             status = f"{r.n_fetched:>4} fetched, {r.n_new:>4} new" if r.ok else f"ERROR: {r.error[:60]}"
-            print(f"  {r.source_id:<10} {status}")
+            print(f"  {r.source_id:<18} {status}")
+            for name, n in list(r.breakdown.items())[:12]:
+                print(f"      {n:>4}  {name}")
+            if len(r.breakdown) > 12:
+                print(f"      ... and {len(r.breakdown) - 12} more institutions")
         print(f"\nTotal papers in database: {storage.count()}")
         return 0 if any(r.ok for r in results) else 1
+
+    if args.command == "check-sources":
+        rows = check_sources(config, only=args.only)
+        print(f"\n{'source':<18}{'status':<8}{'items':>6}{'abstract':>10}  newest")
+        print("-" * 60)
+        for r in rows:
+            if r["ok"]:
+                print(f"{r['id']:<18}{'OK':<8}{r['n']:>6}{r['with_abstract']:>10}  {r['newest']}")
+                for name, n in r.get("institutions", [])[:25]:
+                    print(f"{'':<20}{n:>4}  {name}")
+            else:
+                print(f"{r['id']:<18}{'FAIL':<8}  {r['error']}")
+        bad = [r["id"] for r in rows if not r["ok"] or r["n"] == 0]
+        print(f"\n{len(rows) - len(bad)}/{len(rows)} sources returned items."
+              + (f" Check: {', '.join(bad)}" if bad else ""))
+        return 0
 
     site_cfg = yaml.safe_load((ROOT / "config" / "site.yaml").read_text(encoding="utf-8"))
 

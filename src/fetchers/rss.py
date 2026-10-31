@@ -13,6 +13,7 @@ import re
 from calendar import timegm
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
 
 import feedparser
 
@@ -59,6 +60,31 @@ def _parse_authors(entry) -> list[str]:
     return []
 
 
+class InstitutionResolver:
+    """Attributes items of an aggregated feed to the institution that issued them,
+    from the link's domain or, failing that, a RePEc archive code in the link."""
+
+    def __init__(self, institutions: list[dict]):
+        self.by_domain, self.by_repec = {}, {}
+        for inst in institutions:
+            for d in inst.get("domains", []):
+                self.by_domain[d.lower()] = inst
+            for code in inst.get("repec", []):
+                self.by_repec[code.lower()] = inst
+
+    def resolve(self, link: str) -> Optional[dict]:
+        host = (urlparse(link).hostname or "").lower()
+        parts = host.split(".")
+        for i in range(len(parts) - 1):          # www.ecb.europa.eu -> ecb.europa.eu -> europa.eu
+            inst = self.by_domain.get(".".join(parts[i:]))
+            if inst:
+                return inst
+        m = re.search(r"repec[^/]*/[a-z]/([a-z0-9]+)/|RePEc:([a-z0-9]+):", link, re.IGNORECASE)
+        if m:
+            return self.by_repec.get((m.group(1) or m.group(2)).lower())
+        return None
+
+
 def parse_feed(content: bytes, source: dict) -> list[Paper]:
     """Turn raw feed bytes into Paper objects. Kept separate from the
     network call so it can be unit-tested with saved fixtures."""
@@ -66,12 +92,24 @@ def parse_feed(content: bytes, source: dict) -> list[Paper]:
     if feed.bozo and not feed.entries:
         raise FetchError(f"{source['id']}: could not parse feed ({feed.bozo_exception})")
 
+    resolver = InstitutionResolver(source["_institutions"]) if source.get("_institutions") else None
     papers = []
     for entry in feed.entries:
         title = clean_text(entry.get("title", ""))
         link = entry.get("link", "").strip()
         if not title or not link:
             continue  # unusable entry
+        source_id, source_name = source["id"], source["name"]
+        if resolver:
+            inst = resolver.resolve(link)
+            if inst and inst.get("skip"):
+                continue  # covered by a dedicated source
+            if inst:
+                source_id, source_name = inst["id"], inst["name"]
+            else:
+                host = (urlparse(link).hostname or "unknown").removeprefix("www.")
+                log.info("[%s] no institution mapped for %s", source["id"], host)
+                source_id, source_name = f"other:{host}", f"Other central bank ({host})"
         abstract = clean_text(entry.get("summary") or entry.get("description") or "")
         authors = _parse_authors(entry)
         m = _TITLE_AUTHORS_RE.match(title)
@@ -80,8 +118,8 @@ def parse_feed(content: bytes, source: dict) -> list[Paper]:
             authors = authors or split_authors(m.group("authors"))
         papers.append(
             Paper(
-                source_id=source["id"],
-                source_name=source["name"],
+                source_id=source_id,
+                source_name=source_name,
                 title=title,
                 url=link,
                 abstract=abstract,

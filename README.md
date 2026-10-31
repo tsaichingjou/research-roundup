@@ -5,9 +5,9 @@ journals, central banks and research institutions, and produces a monthly
 HTML newsletter of 5–8 curated papers with plain-language summaries and an
 EM / DM / Transversal market classification.
 
-> **Status: step 3 of 5.** Ingestion (NBER, BIS, IMF, top-5 journals), LLM
-> analysis, the email-ready newsletter and the interactive explorer are in place.
-> Remaining: central-bank sources and automated monthly publishing to GitHub Pages.
+> **Status: step 4 of 5.** All required source groups are configured, with LLM
+> analysis, the email-ready newsletter and the interactive explorer in place.
+> Remaining: automated weekly screening and monthly publishing to GitHub Pages.
 
 ## Architecture
 
@@ -19,6 +19,7 @@ sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screenin
 | Path | Role |
 |---|---|
 | `config/sources.yaml` | Every monitored source, its type and URL. Add or disable sources without touching code. |
+| `config/institutions.yaml` | Central banks reached through the BIS Research Hub feed: domain → institution and group. |
 | `src/models.py` | `Paper` data model, stable IDs and title normalisation. |
 | `src/fetchers/` | One module per source *type*: `rss.py` for any RSS/RDF/Atom feed, `crossref.py` for journals and series with an ISSN (Crossref REST API), `http.py` for shared download/retry logic. |
 | `src/storage.py` | SQLite storage with de-duplication by URL **and** by normalised title, plus a `fetch_log` table recording every run. |
@@ -50,6 +51,7 @@ file is git-ignored, so the key never reaches the repository.
 ```bash
 python main.py fetch                 # fetch all enabled sources
 python main.py fetch --only nber     # fetch one source
+python main.py check-sources         # test every feed without storing: items, abstracts, newest date
 python main.py show --limit 10       # list the latest stored papers
 python main.py models                # list Gemini models your key can use
 python main.py check                 # test each configured model and its response time
@@ -62,6 +64,38 @@ python main.py evaluate              # compare LLM classification with the human
 python main.py evaluate --rerun      # same, re-classifying the sample with the current prompt
 python -m pytest -q                  # run tests (no network or API key needed)
 ```
+
+## Source coverage
+
+| Required in the brief | How it is covered | Channel |
+|---|---|---|
+| AER, Econometrica, JPE, QJE, REStud | One source per journal | Crossref API by ISSN (90-day look-back, as journals register DOIs in batches) |
+| NBER | All new working papers | NBER RSS |
+| BPEA | Spring and autumn editions | Crossref API by ISSN (1-year look-back; no feed exists) |
+| IMF | IMF Working Papers | Crossref API by ISSN (the IMF RSS endpoint returns 404) |
+| BIS | BIS Working Papers | BIS RSS |
+| 12 Federal Reserve regional banks + Board | One source per bank | Fed in Print RSS (the Federal Reserve System's own catalogue) |
+| G10 central banks | ECB, Bank of Japan, Bank of England, Bank of Canada, Bundesbank, Banque de France, Banca d'Italia, De Nederlandsche Bank, National Bank of Belgium, Riksbank, SNB (Fed via Fed in Print) | BIS Central Bank Research Hub RSS |
+| European national central banks | 25 banks, from Banco de España to Norges Bank and the NBP | BIS Central Bank Research Hub RSS |
+
+The BIS Central Bank Research Hub republishes new research from more than 50
+central banks in a single feed, each item linking to the paper on the issuing
+bank's website. The agent attributes every item to that bank from the link's
+domain (`config/institutions.yaml`), so the newsletter credits, say, the Bank of
+Japan rather than the BIS; Fed and BIS items are skipped there because they are
+fetched directly. The Hub also carries emerging-market central banks (Brazil,
+Mexico, Chile, Korea and others), which strengthens EM coverage. One feed for
+dozens of banks is far more reliable than scraping dozens of differently built
+websites; the trade-off is dependence on the Hub's update lag.
+
+`python main.py check-sources` fetches every feed without storing anything and
+reports items, how many have usable abstracts, and the newest date — the first
+thing to run when a source looks quiet.
+
+**Known fallbacks.** JPE and some journal records carry no abstract in Crossref,
+so those papers are listed but not assessed (as agreed for paywalled sources);
+Fed in Print feeds also include speeches and articles, which are excluded when
+they lack an abstract or are screened out as low relevance.
 
 ## Reliability design
 
@@ -163,5 +197,5 @@ Results: see `evaluation/report.txt`.
 1. ~~Ingestion pipeline (NBER, BIS, IMF, top-5 journals)~~
 2. ~~LLM analysis module — relevance score, summary, key takeaways, EM/DM/Transversal with rationale~~
 3. ~~Responsive, email-safe HTML newsletter and interactive explorer~~
-4. Remaining sources: G10 and European central banks, 12 regional Fed banks, BPEA
+4. ~~Remaining sources: G10 and European central banks, 12 regional Fed banks, BPEA~~
 5. Weekly fetch / monthly publish with GitHub Actions, deployed to GitHub Pages

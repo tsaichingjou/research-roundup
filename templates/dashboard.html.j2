@@ -126,6 +126,8 @@
   .chart .seg-bar:last-child { border-radius: 0 3px 3px 0; }
   .chart .seg-bar:only-child { border-radius: 3px; }
   .chart .seg-bar.na { background: repeating-linear-gradient(135deg, #dfe4ea 0 4px, #f2f4f7 4px 8px); }
+  .chart .grp { grid-column: 1 / -1; font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 10px; padding-bottom: 2px; border-bottom: 1px solid var(--rule); }
+  .chart .grp:first-child { margin-top: 0; }
   .chart .tot { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
   .tip { position: fixed; pointer-events: none; background: var(--ink); color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; z-index: 50; display: none; max-width: 260px; }
   table.cov { width: 100%; border-collapse: collapse; margin-top: 28px; font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -224,7 +226,7 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
   const srcName = id => (DATA.sources[id] || {}).name || id;
-  const shortSrc = id => { const n = srcName(id); const m = n.match(/\(([^)]+)\)$/); return m ? m[1] : n; };
+  const shortSrc = id => (DATA.sources[id] || {}).short || srcName(id);
   const focusLabel = f => f === "Transversal" ? "Transversal" : FOCUS[f].name;
 
   const state = {
@@ -242,8 +244,13 @@
 
   // ---------- source selector ----------
   const srcSel = $("source-select");
-  srcSel.innerHTML = `<option value="all">All sources</option>` + Object.values(DATA.sources)
-    .sort((a, b) => a.name.localeCompare(b.name)).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+  const withPapers = new Set(DATA.papers.map(p => p.source));
+  const groups = {};
+  Object.values(DATA.sources).filter(s => withPapers.has(s.id))
+    .sort((a, b) => a.group_rank - b.group_rank || a.name.localeCompare(b.name))
+    .forEach(s => (groups[s.group] = groups[s.group] || []).push(s));
+  srcSel.innerHTML = `<option value="all">All sources</option>` + Object.entries(groups).map(([g, list]) =>
+    `<optgroup label="${esc(g)}">${list.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</optgroup>`).join("");
   srcSel.addEventListener("change", () => { state.source = srcSel.value; render(); });
   $("sort-select").addEventListener("change", e => { state.sort = e.target.value; render(); });
   $("q").addEventListener("input", e => { state.q = e.target.value.trim().toLowerCase(); render(); });
@@ -384,6 +391,8 @@
   }
 
   // ---------- coverage chart + table ----------
+  const rank = id => (DATA.sources[id] || {}).group_rank ?? 99;
+  const groupOf = id => (DATA.sources[id] || {}).group || "Other";
   function renderCoverage() {
     const issue = currentIssue();
     const pool = issue ? DATA.papers.filter(p => inWindow(p, issue)) : DATA.papers;
@@ -396,26 +405,28 @@
       FOCUS_KEYS.forEach(k => r[k] = ps.filter(p => p.status === "scored" && p.focus === k).length);
       r.scored = FOCUS_KEYS.reduce((s, k) => s + r[k], 0);
       return r;
-    }).sort((a, b) => b.total - a.total);
+    }).sort((a, b) => rank(a.id) - rank(b.id) || b.total - a.total);
     const max = Math.max(1, ...rows.map(r => r.total));
     $("cov-sub").textContent = issue
       ? `Every publication screened for the ${issue.title} issue, by source and market focus. Hatched bars are papers that could not be assessed, usually because the publisher provides no abstract.`
       : "Every publication in the database, by source and market focus. Hatched bars are papers that could not be assessed, usually because the publisher provides no abstract.";
     $("chart-legend").innerHTML = FOCUS_KEYS.map(k => `<span><span class="swatch" style="background:${VAR[k]}"></span>${esc(focusLabel(k))}</span>`).join("")
       + `<span><span class="swatch" style="background:repeating-linear-gradient(135deg,#dfe4ea 0 3px,#f2f4f7 3px 6px);border:1px solid #d5dbe3"></span>Not assessed</span>`;
+    let lastGroup = null;
     $("chart").innerHTML = rows.map(r => {
+      const head = groupOf(r.id) !== lastGroup ? `<span class="grp">${esc(lastGroup = groupOf(r.id))}</span>` : "";
       const segs = FOCUS_KEYS.filter(k => r[k]).map(k =>
         `<span class="seg-bar" data-tip="${esc(shortSrc(r.id))}: ${r[k]} ${esc(focusLabel(k).toLowerCase())}" style="width:${r[k] / max * 100}%;background:${VAR[k]}"></span>`).join("")
         + (r.na ? `<span class="seg-bar na" data-tip="${esc(shortSrc(r.id))}: ${r.na} not assessed (${esc(r.reasons.join(", "))})" style="width:${r.na / max * 100}%"></span>` : "");
-      return `<span class="lbl">${esc(shortSrc(r.id))}</span><span class="track">${segs}</span><span class="tot">${r.total}</span>`;
+      return `${head}<span class="lbl">${esc(shortSrc(r.id))}</span><span class="track">${segs}</span><span class="tot">${r.total}</span>`;
     }).join("");
     $("chart").querySelectorAll("[data-tip]").forEach(s => {
       s.addEventListener("mousemove", e => showTip(e, esc(s.dataset.tip).replace(/^([^:]+):/, "<b>$1</b>:")));
       s.addEventListener("mouseleave", hideTip);
     });
     $("cov-table").innerHTML = `<caption id="cov-table-caption" class="visually-hidden">Papers per source</caption>
-      <thead><tr><th scope="col">Source</th><th scope="col">Type</th><th scope="col">Screened</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Not assessed</th><th scope="col">Featured</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><td>${esc(srcName(r.id))}</td><td>${esc((DATA.sources[r.id].category || "").replace("_", " "))}</td>
+      <thead><tr><th scope="col">Source</th><th scope="col">Group</th><th scope="col">Screened</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Not assessed</th><th scope="col">Featured</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${esc(srcName(r.id))}</td><td>${esc(groupOf(r.id))}</td>
         <td>${r.total}</td>${FOCUS_KEYS.map(k => `<td>${r[k]}</td>`).join("")}<td>${r.na}${r.reasons.length ? ` <span style="color:var(--muted)">(${esc(r.reasons.join(", "))})</span>` : ""}</td><td>${r.featured}</td></tr>`).join("")}</tbody>`;
   }
 
@@ -446,7 +457,7 @@
     renderCoverage();
   }
 
-  $("footer").innerHTML = `Data updated ${fmtDate(DATA.generated_at)}. ${DATA.papers.length} publications in the database from ${Object.keys(DATA.sources).length} configured sources.
+  $("footer").innerHTML = `Data updated ${fmtDate(DATA.generated_at)}. ${DATA.papers.length} publications in the database from ${new Set(DATA.papers.map(p => p.source)).size} sources.
     Summaries and classifications are produced by a language model from titles and abstracts and may contain errors. <a href="data/site.json">Download the data (JSON)</a>.`;
   document.addEventListener("keydown", e => { if (e.key === "Escape" && $("detail").classList.contains("open") && window.innerWidth <= 900) { state.selected = null; render(); } });
   render();
