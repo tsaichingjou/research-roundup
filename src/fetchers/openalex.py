@@ -136,6 +136,29 @@ def works(filters: list[str], settings: dict, per_page: int = 50) -> list[dict]:
                 per_page=per_page, select=SELECT).get("results", [])
 
 
+def _fetch_journal(source: dict, settings: dict, base: list[str]) -> list[Paper]:
+    """Works in one journal: by ISSN (print or online, any location), and if that
+    finds nothing, by the OpenAlex source found under the journal's name."""
+    diagnostics = {}
+    found: list[dict] = []
+    if source.get("issn"):
+        issns = source["issn"] if isinstance(source["issn"], list) else [source["issn"]]
+        found = works(base + [f"locations.source.issn:{'|'.join(issns)}"], settings)
+        diagnostics["by ISSN"] = f"{len(found)} works ({', '.join(issns)})"
+    if not found and source.get("source_name"):
+        results = _get(f"{API}/sources", settings, search=source["source_name"], per_page=5,
+                       select="id,display_name,issn").get("results", [])
+        match = next((r for r in results if name_key(r.get("display_name", "")) == name_key(source["source_name"])), None)
+        if match:
+            sid = match["id"].rsplit("/", 1)[-1]
+            found = works(base + [f"primary_location.source.id:{sid}"], settings)
+            diagnostics["by name"] = f"{len(found)} works ({sid}, ISSNs {match.get('issn')})"
+        else:
+            diagnostics["by name"] = f"no OpenAlex source named '{source['source_name']}'"
+    source["_diagnostics"] = diagnostics
+    return [p for w in found if (p := _to_paper(w, source["id"], source["name"]))]
+
+
 def fetch(source: dict, settings: dict) -> list[Paper]:
     lookback = source.get("lookback_days", 60)
     since = (datetime.now(timezone.utc) - timedelta(days=lookback)).date().isoformat()
@@ -143,11 +166,8 @@ def fetch(source: dict, settings: dict) -> list[Paper]:
     if source.get("require_abstract", True):
         base.append("has_abstract:true")
 
-    if source.get("issn"):
-        # a journal can be indexed under its print or its online ISSN: match either, in any location
-        issns = source["issn"] if isinstance(source["issn"], list) else [source["issn"]]
-        return [p for w in works(base + [f"locations.source.issn:{'|'.join(issns)}"], settings)
-                if (p := _to_paper(w, source["id"], source["name"]))]
+    if source.get("issn") or source.get("source_name"):
+        return _fetch_journal(source, settings, base)
 
     # institution mode
     groups = set(source.get("include_groups") or [])

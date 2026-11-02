@@ -119,6 +119,7 @@ sources:
     group: Research institutions
     type: openalex
     issn: [0007-2303, 1533-4465]    # print and online ISSN
+    source_name: Brookings Papers on Economic Activity   # fallback: look the journal up by name
     lookback_days: 365
     require_abstract: false
     enabled: true

@@ -170,3 +170,26 @@ def test_enrichment_stops_using_openalex_after_quota(monkeypatch):
     for i in range(3):
         e.enrich({"uid": str(i), "title": "T", "url": f"https://doi.org/10.1/{i}"})
     assert sum("openalex" in c for c in calls) == 1 and e.quota_note
+
+
+def test_journal_falls_back_to_source_name(api, monkeypatch):
+    inner = openalex.download
+
+    def fake(url, settings, params=None):
+        if url.endswith("/sources"):
+            return json.dumps({"results": [{"id": "https://openalex.org/S42",
+                                            "display_name": "Brookings Papers on Economic Activity",
+                                            "issn": ["0007-2303"]}]}).encode()
+        if "issn:" in (params or {}).get("filter", ""):
+            return json.dumps({"results": []}).encode()
+        if "source.id:S42" in (params or {}).get("filter", ""):
+            return json.dumps({"results": [work("Demand-Driven Inflation", "10.1353/eca.2")]}).encode()
+        return inner(url, settings, params)
+
+    monkeypatch.setattr(openalex, "download", fake)
+    src = {"id": "bpea", "name": "BPEA", "issn": ["0007-2303"],
+           "source_name": "Brookings Papers on Economic Activity", "lookback_days": 365}
+    papers = openalex.fetch(src, {})
+    assert [p.title for p in papers] == ["Demand-Driven Inflation"]
+    assert src["_diagnostics"]["by ISSN"].startswith("0 works")
+    assert src["_diagnostics"]["by name"].startswith("1 works (S42")

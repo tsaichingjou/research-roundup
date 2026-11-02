@@ -38,15 +38,23 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Check secrets
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::The GEMINI_API_KEY secret is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          [ -n "$OPENALEX_API_KEY" ] || echo "::notice::OPENALEX_API_KEY not set: OpenAlex runs on its smaller anonymous budget."
 
       - name: Decide weekly or monthly
         id: mode
@@ -60,23 +68,29 @@ jobs:
           fi
 
       - name: Fetch new papers and recover missing abstracts
+        id: fetch
         run: python main.py fetch
 
       - name: Weekly — score new papers
+        id: weekly
         if: steps.mode.outputs.mode == 'weekly'
         run: |
           python main.py screen
           python main.py build
 
       - name: Monthly — select, write up and publish the issue
+        id: monthly
         if: steps.mode.outputs.mode == 'monthly'
         run: python main.py publish
 
+      # Save whatever was fetched even if a later step failed, so no work is lost.
       - name: Commit database and site
+        if: always() && steps.fetch.outcome == 'success'
         run: |
           git config user.name "research-roundup-bot"
           git config user.email "research-roundup-bot@users.noreply.github.com"
-          git add -f data/published.db docs
+          git add -f data/published.db
+          [ -d docs ] && git add -f docs
           if git diff --cached --quiet; then
             echo "Nothing changed."
           else
@@ -86,6 +100,7 @@ jobs:
           fi
 
       - uses: actions/upload-pages-artifact@v3
+        if: success()
         with:
           path: docs
 
