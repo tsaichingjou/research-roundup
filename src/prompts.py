@@ -74,20 +74,40 @@ def screening_prompt(papers: list[dict]) -> str:
 
 def analysis_prompt(paper: dict) -> str:
     authors = ", ".join(paper.get("authors") or []) or "not listed"
+    full_text = paper.get("full_text")
+    if full_text:
+        material = f"""Abstract: {paper['abstract']}
+
+Full text (may be truncated; references removed):
+<<<
+{full_text}
+>>>"""
+        basis = "the paper (abstract and full text)"
+        takeaway_rule = ("each a concrete finding or implication from the paper; quote the key "
+                         "estimate, magnitude, sample or period where the text gives one")
+        extra = """
+Use the full text to be specific — the headline estimates, the data and period, and what
+the authors conclude for policy or markets. Use only numbers that appear in the text,
+and do not describe tables or figures you cannot see."""
+    else:
+        material = f"Abstract: {paper['abstract']}"
+        basis = "the abstract"
+        takeaway_rule = "each a concrete finding or implication stated in the abstract"
+        extra = ""
     return f"""Write the newsletter entry for this paper.
 
 Source: {paper['source']}
 Title: {paper['title']}
 Authors: {authors}
-Abstract: {paper['abstract']}
-
+{material}
+{extra}
 {MARKET_FOCUS_GUIDE}
 
 Return one JSON object with exactly these keys:
   "summary": plain-language summary for a non-specialist finance professional, 70-110 \
 words, no jargon without explanation, no hype;
-  "key_takeaways": array of exactly 3 short bullet strings (max 25 words each), each a \
-concrete finding or implication stated in the abstract;
+  "key_takeaways": array of exactly 3 short bullet strings (max 30 words each), \
+{takeaway_rule};
   "relevance": 50-90 words on why this matters for markets research — which asset \
 classes, policy debates or economies it informs, and how a strategist might use it. Be \
 specific but do not overstate;
@@ -96,7 +116,7 @@ specific but do not overstate;
 setting or scope;
   "regions": array of the countries/regions the paper studies (empty if none stated);
   "topics": array of 1-3 topic tags (e.g. "Monetary policy", "Inflation", "Trade");
-  "confidence": "high" | "medium" | "low" — how well the abstract supports the analysis."""
+  "confidence": "high" | "medium" | "low" — how well {basis} supports the analysis."""
 
 
 def intro_prompt(papers: list[dict]) -> str:

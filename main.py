@@ -14,6 +14,7 @@ Usage
     python main.py export-labels          # write a blind labelling sample to evaluation/labels.csv
     python main.py evaluate [--rerun]     # compare LLM classification with your labels
     python main.py publish                # analyse, freeze this month's issue and build the site
+    python main.py publish --rewrite      # same, regenerating this month's write-ups
     python main.py build                  # rebuild the site (docs/) from the database, no LLM calls
 """
 
@@ -38,6 +39,7 @@ from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
 from src.issues import publish_issue  # noqa: E402
 from src.llm import GeminiClient, LLMError  # noqa: E402
 from src.pipeline import check_sources, load_config, run_fetch  # noqa: E402
+from src.fulltext import FullTextFinder  # noqa: E402
 from src.site import build_site  # noqa: E402
 from src.storage import Storage  # noqa: E402
 
@@ -47,6 +49,41 @@ def make_client(acfg: dict, stage: str) -> GeminiClient:
     return GeminiClient(models=llm[f"{stage}_models"], temperature=llm.get("temperature", 0.2),
                         min_interval_seconds=llm.get("min_interval_seconds", 4),
                         timeout=llm.get("timeout_seconds", 90))
+
+
+def make_finder(acfg: dict, settings: dict) -> FullTextFinder | None:
+    ft = acfg.get("full_text", {})
+    if not ft.get("enabled", True):
+        return None
+    return FullTextFinder(settings, max_chars=ft.get("max_chars", 60000))
+
+
+def print_usage(*clients) -> None:
+    """Gemini requests and tokens used in this run, per model."""
+    rows = {}
+    for c in clients:
+        for model, u in getattr(c, "usage", {}).items():
+            r = rows.setdefault(model, {"requests": 0, "input": 0, "output": 0})
+            for k in r:
+                r[k] += u[k]
+    if not rows:
+        return
+    print("\nGemini usage this run")
+    print(f"  {'model':<26}{'requests':>9}{'input tokens':>15}{'output tokens':>15}")
+    for model, r in rows.items():
+        print(f"  {model:<26}{r['requests']:>9}{r['input']:>15,}{r['output']:>15,}")
+    total = {k: sum(r[k] for r in rows.values()) for k in ("requests", "input", "output")}
+    print(f"  {'total':<26}{total['requests']:>9}{total['input']:>15,}{total['output']:>15,}")
+
+
+def print_basis(entries: list[dict]) -> None:
+    full = [e for e in entries if e["analysis"].get("basis") == "full text"]
+    print(f"\nWrite-ups from the full text: {len(full)}/{len(entries)}")
+    for e in entries:
+        a = e["analysis"]
+        how = (f"full text ({a.get('full_text_kind')}, {a.get('full_text_chars', 0):,} chars)"
+               if a.get("basis") == "full text" else "abstract only")
+        print(f"  - {e['paper']['title'][:60]:<62} {how}")
 
 
 def print_analysis(report: dict) -> None:
@@ -89,7 +126,9 @@ def main() -> int:
     p_fetch = sub.add_parser("fetch", help="Fetch new papers from enabled sources")
     p_fetch.add_argument("--only", nargs="+", help="Source ids to fetch")
     p_fetch.add_argument("--no-enrich", action="store_true", help="Skip recovering missing abstracts")
-    sub.add_parser("enrich", help="Recover missing abstracts from OpenAlex and publisher pages")
+    p_en = sub.add_parser("enrich", help="Recover missing abstracts from OpenAlex and publisher pages")
+    p_en.add_argument("--retry-all", action="store_true",
+                      help="Also retry papers tried in the last week (e.g. after adding a recovery method)")
 
     p_chk = sub.add_parser("check-sources", help="Test every source feed without storing anything")
     p_chk.add_argument("--only", nargs="+", help="Source ids to check")
@@ -111,7 +150,9 @@ def main() -> int:
     p_ev.add_argument("--rerun", action="store_true",
                       help="Re-classify the labelled papers now with the current prompt")
 
-    sub.add_parser("publish", help="Analyse, freeze this month's issue and build the site")
+    p_pub = sub.add_parser("publish", help="Analyse, freeze this month's issue and build the site")
+    p_pub.add_argument("--rewrite", action="store_true",
+                       help="Regenerate the write-ups of this month's selected papers")
     sub.add_parser("build", help="Rebuild the static site from the database")
 
     args = parser.parse_args()
@@ -142,7 +183,8 @@ def main() -> int:
 
     if args.command == "enrich":
         print_enrichment(run_enrichment(storage, config["settings"],
-                                        load_analysis_config(ROOT / "config" / "analysis.yaml")))
+                                        load_analysis_config(ROOT / "config" / "analysis.yaml"),
+                                        retry_all=args.retry_all))
         return 0
 
     if args.command == "check-sources":
@@ -181,13 +223,19 @@ def main() -> int:
 
     if args.command == "publish":
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        client = writer = None
         try:
             client, writer = make_client(acfg, "screening"), make_client(acfg, "analysis")
-            report = run_analysis(storage, client, acfg, analysis_client=writer)
+            report = run_analysis(storage, client, acfg, analysis_client=writer,
+                                  rewrite=args.rewrite,
+                                  fulltext_finder=make_finder(acfg, config["settings"]))
             issue = publish_issue(storage, report, client=writer)
         except (LLMError, ValueError) as exc:
             print(f"ERROR: {exc}")
+            print_usage(*[c for c in (client, writer) if c])
             return 1
+        print_basis(report["entries"])
+        print_usage(client, writer)
         print(f"Published the {issue['title']} issue with {len(issue['paper_uids'])} papers.")
         print(f"Editor's note: {issue['intro']}")
         return build()
@@ -221,10 +269,12 @@ def main() -> int:
     if args.command == "screen":
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
         try:
-            r = run_screening(storage, make_client(acfg, "screening"), acfg)
+            screener = make_client(acfg, "screening")
+            r = run_screening(storage, screener, acfg)
         except LLMError as exc:
             print(f"ERROR: {exc}")
             return 1
+        print_usage(screener)
         print(f"\nScreening: {r['new']} new papers, {r['scored']} scored, {r['excluded']} excluded"
               + (f", {r['unscored']} left for the next run" if r["unscored"] else ""))
         return 0
@@ -245,15 +295,16 @@ def main() -> int:
                 return 0
             writer = make_client(acfg, "analysis")
             report = run_analysis(storage, client, acfg, analysis_client=writer,
-                                  rewrite=getattr(args, "rewrite", False))
+                                  rewrite=getattr(args, "rewrite", False),
+                                  fulltext_finder=make_finder(acfg, config["settings"]))
         except LLMError as exc:
             print(f"\nERROR: {exc}")
             return 1
         out = ROOT / "output" / "latest_analysis.json"
         out.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
         print_analysis(report)
-        print(f"\nLLM calls this run: {client.calls} screening ({client.model}), "
-              f"{writer.calls} analysis ({writer.model})")
+        print_basis(report["entries"])
+        print_usage(client, writer)
         print(f"Full results saved to {out.relative_to(ROOT)}")
         return 0
 

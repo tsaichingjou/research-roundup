@@ -32,6 +32,7 @@ enrichment:                   # recover missing abstracts before excluding a pap
   enabled: true
   openalex: true              # free scholarly index, by DOI or exact title
   landing_page: true          # abstract metadata tags on the paper's own page
+  page_text: true             # else the opening of the open text (PDF abstract section or first paragraphs)
   retry_after_days: 7         # a paper not found is retried a week later
   max_per_run: 300
   max_title_searches: 40      # OpenAlex bills title searches (DOI lookups are free): cap per run
@@ -50,10 +51,16 @@ prefilter:
     - "^report of the"
     - "^in memoriam"
     - "^obituary"
+    - "^replication (package|data|files|materials|code)"   # datasets deposited by central banks
+    - "^(code and data|data and code|data for|supplementary)"
 
 screening:
   batch_size: 8               # papers per screening call
   max_abstract_chars: 1500    # abstracts are truncated to this length when screening
+
+full_text:                    # write-ups of the selected papers (src/fulltext.py)
+  enabled: true               # read the open full text when available; otherwise the abstract
+  max_chars: 60000            # ~15k tokens: introduction, results and conclusion; references dropped
 
 selection:
   min_papers: 5

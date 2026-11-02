@@ -105,6 +105,7 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
     recovered = sum(c.get("abstract recovered", 0) for c in cov.values())
     return {
         "site": site, "issue": issue, "entries": entries, "focus": FOCUS, "recovered": recovered,
+        "n_full": sum(e["analysis"].get("basis") == "full text" for e in entries),
         "sources": data["sources"],
         "composition": [(k, composition[k]) for k in FOCUS if composition[k]],
         "n_sources": len(cov),

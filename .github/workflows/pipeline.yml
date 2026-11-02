@@ -16,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "weekly = fetch and score; monthly = fetch, write up and publish the issue"
+        description: "weekly = fetch and score; monthly = fetch, write up and publish the issue; republish = retry missing abstracts and rewrite this month's issue"
         type: choice
-        options: [weekly, monthly]
+        options: [weekly, monthly, republish]
         default: monthly
 
 concurrency:
@@ -82,6 +82,13 @@ jobs:
         id: monthly
         if: steps.mode.outputs.mode == 'monthly'
         run: python main.py publish
+
+      - name: Republish — retry missing abstracts, rewrite this month's issue
+        id: republish
+        if: steps.mode.outputs.mode == 'republish'
+        run: |
+          python main.py enrich --retry-all
+          python main.py publish --rewrite
 
       # Save whatever was fetched even if a later step failed, so no work is lost.
       - name: Commit database and site

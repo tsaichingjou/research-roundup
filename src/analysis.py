@@ -19,6 +19,7 @@ from pathlib import Path
 import yaml
 
 from src import prompts
+from src.fulltext import DATASET_HOSTS  # replication packages, not papers
 from src.llm import JSONModel, LLMAuthError, LLMError
 from src.storage import Storage
 
@@ -46,7 +47,9 @@ def prefilter(papers: list[dict], cfg: dict) -> tuple[list[dict], list[dict]]:
     patterns = [re.compile(p, re.IGNORECASE) for p in cfg["prefilter"]["exclude_title_patterns"]]
     kept, excluded = [], []
     for p in papers:
-        if any(rx.search(p["title"]) for rx in patterns):
+        if any(h in (p.get("url") or "") for h in DATASET_HOSTS):
+            excluded.append({"uid": p["uid"], "status": "excluded", "reason": "dataset, not a paper"})
+        elif any(rx.search(p["title"]) for rx in patterns):
             excluded.append({"uid": p["uid"], "status": "excluded", "reason": "not a research paper"})
         elif len(p.get("abstract") or "") < min_chars:
             excluded.append({"uid": p["uid"], "status": "excluded", "reason": "no abstract available"})
@@ -179,15 +182,20 @@ def _validate_analysis(data: dict) -> dict:
     }
 
 
-def analyse_paper(paper: dict, client: JSONModel) -> dict:
+def analyse_paper(paper: dict, client: JSONModel, full_text=None) -> dict:
+    """Write one newsletter entry. `full_text` (a fulltext.FullText) is used when
+    the paper is openly available; otherwise the entry rests on the abstract."""
     prompt = prompts.analysis_prompt({
         "source": paper["source_name"], "title": paper["title"],
         "authors": paper.get("authors"), "abstract": paper["abstract"],
+        "full_text": full_text.text if full_text else None,
     })
+    basis = ({"basis": "full text", "full_text_url": full_text.url, "full_text_kind": full_text.kind,
+              "full_text_chars": len(full_text.text)} if full_text else {"basis": "abstract"})
     last_error = None
     for _ in range(2):  # one retry if the model omits required fields
         try:
-            return _validate_analysis(client.generate_json(prompt, system=prompts.SYSTEM))
+            return {**_validate_analysis(client.generate_json(prompt, system=prompts.SYSTEM)), **basis}
         except ValueError as exc:
             last_error = exc
             log.warning("Invalid analysis for '%s': %s", paper["title"][:60], exc)
@@ -203,7 +211,13 @@ def run_screening(storage: Storage, client: JSONModel, cfg: dict, now: datetime 
     now = now or datetime.now(timezone.utc)
     since = (now - timedelta(days=cfg["window"]["days"])).isoformat()
     screened = storage.get_screening()
-    new = [p for p in storage.candidates(since) if p["uid"] not in screened]
+    candidates = storage.candidates(since)
+    # Papers excluded earlier for lack of an abstract are re-checked against the
+    # (cheap, rule-based) pre-filter, so new rules such as "dataset" apply to them too.
+    stale = [p for p in candidates if screened.get(p["uid"], {}).get("reason") == "no abstract available"]
+    storage.save_screening([e for e in prefilter(stale, cfg)[1]
+                            if e["reason"] != "no abstract available"], model=None)
+    new = [p for p in candidates if p["uid"] not in screened]
     kept, excluded = prefilter(new, cfg)
     storage.save_screening(excluded, model=None)
     results = screen(kept, client, cfg,
@@ -214,11 +228,13 @@ def run_screening(storage: Storage, client: JSONModel, cfg: dict, now: datetime 
 
 def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
                  now: datetime | None = None, analysis_client: JSONModel | None = None,
-                 rewrite: bool = False) -> dict:
+                 rewrite: bool = False, fulltext_finder=None) -> dict:
     """`client` screens; `analysis_client` (defaults to `client`) writes the full
     analyses — a fast, cheap model is enough to score, a stronger one writes.
     `rewrite=True` regenerates the write-ups of the selected papers (e.g. after a
-    prompt change, or when a stronger model is available again)."""
+    prompt change, or when a stronger model is available again).
+    `fulltext_finder` (a fulltext.FullTextFinder) lets the write-ups use the open
+    full text of each selected paper; without it they use the abstract."""
     now = now or datetime.now(timezone.utc)
     analysis_client = analysis_client or client
     since = (now - timedelta(days=cfg["window"]["days"])).isoformat()
@@ -242,8 +258,13 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
         if analysis is None:
             log.info("Writing up %d/%d with %s: %s", i, len(selected),
                      getattr(analysis_client, "model", "LLM"), p["title"][:70])
+            full_text = None
+            if fulltext_finder is not None:
+                full_text = fulltext_finder.find(p)
+                log.info("  %s", f"full text: {full_text.kind}, {len(full_text.text):,} characters"
+                         if full_text else "no open full text: writing from the abstract")
             try:
-                analysis = analyse_paper(p, analysis_client)
+                analysis = analyse_paper(p, analysis_client, full_text)
             except LLMAuthError:
                 raise
             except LLMError as exc:

@@ -80,6 +80,8 @@ class GeminiClient:
         self.max_timeouts = max_timeouts_per_model
         self._last_call = 0.0
         self.calls = 0
+        # Token use per model, from Gemini's usageMetadata: {model: {requests, input, output}}
+        self.usage: dict[str, dict[str, int]] = {}
 
     # -- public ---------------------------------------------------------------
     def generate_json(self, prompt: str, system: str = "") -> dict | list:
@@ -172,7 +174,9 @@ class GeminiClient:
                 continue
 
             if resp.status_code == 200:
-                return self._extract_text(resp.json())
+                payload = resp.json()
+                self._record_usage(payload)
+                return self._extract_text(payload)
             if resp.status_code == 404 or (
                 resp.status_code in (400, 403) and "model" in resp.text.lower()
                 and ("not found" in resp.text.lower() or "not available" in resp.text.lower()
@@ -203,6 +207,13 @@ class GeminiClient:
         log.warning("Gemini %s (attempt %d/%d); waiting %.0fs", reason, attempt,
                     self.max_retries, delay)
         time.sleep(delay)
+
+    def _record_usage(self, payload: dict) -> None:
+        meta = payload.get("usageMetadata") or {}
+        u = self.usage.setdefault(self.model, {"requests": 0, "input": 0, "output": 0})
+        u["requests"] += 1
+        u["input"] += int(meta.get("promptTokenCount") or 0)
+        u["output"] += int(meta.get("candidatesTokenCount") or 0) + int(meta.get("thoughtsTokenCount") or 0)
 
     @staticmethod
     def _extract_text(payload: dict) -> str:

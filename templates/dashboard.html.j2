@@ -413,12 +413,13 @@
       <dl class="facts">
         <dt>Source</dt><dd>${esc(srcName(p.source))}</dd>
         <dt>Published</dt><dd>${fmtDate(p.published) || "Not stated"}</dd>
-        ${p.abstract_source ? `<dt>Abstract</dt><dd>Recovered from ${esc(p.abstract_source)} (not in the original feed)</dd>` : ""}
+        ${p.abstract_source ? `<dt>Abstract</dt><dd>${p.abstract_source === "opening of the text" ? "Opening of the paper's text (no abstract in the feed)" : `Recovered from ${esc(p.abstract_source)} (not in the original feed)`}</dd>` : ""}
         ${p.score != null ? `<dt>Relevance</dt><dd>${p.score} of 10</dd>` : ""}
         ${a && a.topics && a.topics.length ? `<dt>Topics</dt><dd>${esc(a.topics.join(", "))}</dd>` : p.topic ? `<dt>Topic</dt><dd>${esc(p.topic)}</dd>` : ""}
         ${a && a.regions && a.regions.length ? `<dt>Regions</dt><dd>${esc(a.regions.join(", "))}</dd>` : ""}
         ${p.issues.length ? `<dt>Newsletter</dt><dd>${p.issues.map(i => { const x = issues.find(y => y.id === i); return `<a href="issues/${i}.html#p-${p.uid}">${esc(x ? x.title : i)}</a>`; }).join(", ")}</dd>` : ""}
         ${a && a.model ? `<dt>Written by</dt><dd>${esc(a.model)}${a.confidence ? `, ${esc(a.confidence)} confidence` : ""}</dd>` : ""}
+        ${a ? `<dt>Based on</dt><dd>${a.basis === "full text" ? `The full text (${esc(a.full_text_kind || "")})` : "The abstract (no open full text)"}</dd>` : ""}
       </dl>
       ${p.abstract ? `<details class="abstract"><summary>Abstract</summary><p>${esc(p.abstract)}</p></details>` : ""}
       <p style="margin-top:16px"><a href="${esc(p.url)}" target="_blank" rel="noopener">Read the paper</a></p>`;
@@ -495,7 +496,7 @@
   }
 
   $("footer").innerHTML = `Data updated ${fmtDate(DATA.generated_at)}. ${DATA.papers.length} publications in the database from ${new Set(DATA.papers.map(p => p.source)).size} sources.
-    Summaries and classifications are produced by a language model from titles and abstracts and may contain errors. <a href="data/site.json">Download the data (JSON)</a>.
+    Summaries and classifications are produced by a language model from titles and abstracts (and, for newsletter papers, the open full text where available) and may contain errors. <a href="data/site.json">Download the data (JSON)</a>.
     ${DISCLAIMER ? `<br>${esc(DISCLAIMER)}` : ""}`;
   document.addEventListener("keydown", e => { if (e.key === "Escape" && $("detail").classList.contains("open") && window.innerWidth <= 900) { state.selected = null; render(); } });
   render();

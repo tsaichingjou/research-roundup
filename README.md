@@ -30,7 +30,8 @@ sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screenin
 | `config/analysis.yaml` | LLM models, time window, pre-filter rules, screening batch size and selection rules. |
 | `src/llm.py` | Gemini REST client: JSON mode, throttling, back-off on rate limits, model fallback. |
 | `src/prompts.py` | Screening and analysis prompts, including the EM / DM / Transversal definitions. |
-| `src/enrich.py` | Recovers missing abstracts from OpenAlex and publisher pages before papers are written off. |
+| `src/enrich.py` | Recovers missing abstracts from OpenAlex, publisher pages or the opening of the paper's text before papers are written off. |
+| `src/fulltext.py` | Finds and reads a paper's open full text (PDF or web page) for the write-ups. |
 | `src/analysis.py` | Pre-filter → batched screening → selection → deep analysis, all cached in SQLite. |
 | `src/issues.py` | Freezes the selection into a monthly issue with an editor's note; past issues never change. |
 | `src/site.py`, `templates/` | Builds the static site: one email-ready newsletter per issue and the interactive explorer. |
@@ -64,7 +65,7 @@ suite without network access or API keys.
 |---|---|---|
 | Mondays 05:23 UTC | Weekly screening | `fetch` (with abstract recovery) → `screen` → `build` |
 | 1st of the month, 06:17 UTC | Monthly issue | `fetch` → `publish` (select, write up, freeze the issue, build) |
-| On demand | Either | "Run workflow" button in the Actions tab |
+| On demand | Weekly, monthly or republish | "Run workflow" button in the Actions tab; *republish* retries every missing abstract and rewrites the current month's issue (`enrich --retry-all` → `publish --rewrite`), e.g. after a prompt change |
 
 Each run commits its database (`data/published.db`) and the built site
 (`docs/`) back to the repository, so the next run continues where the last one
@@ -193,17 +194,21 @@ reports items, how many have usable abstracts, and the newest date — the first
 thing to run when a source looks quiet.
 
 **Missing abstracts.** Some channels deliver titles without abstracts (Crossref
-records for JPE, some BIS and Fed in Print items). After every fetch the agent
-tries two open sources before giving up on a paper (`src/enrich.py`):
-**OpenAlex**, a free scholarly index, by DOI or near-exact title; then the
-abstract metadata tags (`citation_abstract`, `dc.description`, `og:description`)
-on the paper's own page, which publishers expose even when the full text is
-paywalled. No paywall is bypassed and no full text is downloaded. The source of
-each recovered abstract is stored and shown in the explorer and the newsletter.
-Papers still without an abstract are listed but not assessed, as agreed for
-paywalled sources, and counted per source in every issue. Fed in Print feeds
-also include speeches and articles, which are excluded when they lack an
-abstract or screened out as low relevance.
+records for JPE, Fed in Print speeches and blog posts, some central-bank
+working papers). After every fetch the agent tries three open sources before
+giving up on a paper (`src/enrich.py`): **OpenAlex**, a free scholarly index, by
+DOI or near-exact title; the abstract metadata tags (`citation_abstract`,
+`dc.description`, `og:description`) on the paper's own page; and finally the
+**opening of the paper's own text** (`src/fulltext.py`) — the section after an
+"Abstract" heading in the PDF, or the first paragraphs of a speech or article,
+capped at the same 1,500 characters used for screening, so this costs no more
+Gemini tokens than an abstract. Only openly published pages are read: a page
+that answers with an error, a login or a bot check is skipped, so no paywall is
+bypassed. The origin of each recovered text is stored and shown in the
+explorer. Papers still without one (in practice mostly JPE) are listed but not
+assessed, as agreed for paywalled sources, and counted per source in every
+issue. Replication datasets that central banks deposit in OpenAlex (Zenodo,
+Dataverse, Mendeley Data) are filtered out as not being papers.
 
 ## Reliability design
 
@@ -246,11 +251,25 @@ overloaded (HTTP 5xx) or too slow — on the Gemini free tier the larger models
 are often overloaded at peak times. Each write-up records the model that
 produced it.
 
+**Full-text write-ups.** Screening uses abstracts (cheap, and enough to rank
+papers), but the 5–8 selected papers are written up from their **open full
+text** when it exists: the paper's own PDF, the PDF its landing page declares
+(`citation_pdf_url`), the publishing bank's page for Fed in Print records, or an
+open-access copy listed by OpenAlex. The text is read with `pypdf`, the
+reference list is dropped and it is capped at 60,000 characters (about 15k
+tokens: introduction, results and conclusions), so the key takeaways can quote
+actual estimates, samples and periods instead of paraphrasing the abstract. The
+model is told to use only numbers that appear in the text. Where no open text
+exists (paywalled journals) or it cannot be read, the entry falls back to the
+abstract. Each entry states which it was written from, in the newsletter and in
+the explorer. This adds about one screening run's worth of tokens per month
+(8 requests); `publish` prints the Gemini requests and tokens used per model.
+
 **Reliability.** JSON-mode output is validated field by field; invalid answers
 are retried once, and papers the model skips are retried on the next run rather
 than guessed. All results are cached, so re-running costs no extra calls.
-The model never sees anything but the title, authors and abstract, and is
-instructed not to state findings that are not in them.
+The model sees only the title, authors, abstract and (for write-ups) the open
+full text, and is instructed not to state findings that are not in them.
 
 ## Newsletter and explorer
 

@@ -116,6 +116,7 @@
       <a href="{{ e.url }}" style="color:#2c5bb8; text-decoration:underline;">Read the paper</a>
       {% if a.topics %}<span style="color:{{ muted }};">&nbsp;&nbsp;Topics: {{ a.topics|join(", ") }}</span>{% endif %}
     </p>
+    <p style="margin:6px 0 0 0; font-family:{{ sans }}; font-size:12px; color:{{ muted }};">{% if a.basis == 'full text' %}Written from the full text ({{ a.full_text_kind }}).{% else %}Written from the abstract (no open full text).{% endif %}</p>
   </td></tr>
   {% endfor %}
 
@@ -125,7 +126,7 @@
     <p style="margin:0 0 8px 0; font-size:14px; font-weight:bold; color:{{ ink }};">How this issue was made</p>
     <p style="margin:0 0 10px 0;">An automated agent screened {{ issue.stats.n_candidates }} new publications from {{ n_sources }} sources ({{ window }}). {{ issue.stats.n_scored }} with a usable abstract were scored for market relevance by a language model, and the {{ entries|length }} above were selected, with at most two papers per source.</p>
     {% if recovered %}
-    <p style="margin:0 0 10px 0;">For {{ recovered }} papers whose feed carried no abstract, the abstract was recovered from OpenAlex or the publisher's page before screening.</p>
+    <p style="margin:0 0 10px 0;">For {{ recovered }} papers whose feed carried no abstract, a stand-in was recovered before screening: from OpenAlex, the publisher's page, or the opening of the paper's own text.</p>
     {% endif %}
     {% if excluded %}
     <p style="margin:0 0 10px 0;">Not assessed this cycle:
@@ -133,7 +134,7 @@
     </p>
     {% endif %}
     <p style="margin:0 0 10px 0;">Market focus: <strong style="color:{{ focus.EM.color }};">Emerging markets</strong> for research centred on emerging or developing economies, <strong style="color:{{ focus.DM.color }};">Developed markets</strong> for advanced economies, and <strong style="color:{{ focus.Transversal.color }};">Transversal</strong> for work spanning both or tied to neither.</p>
-    <p style="margin:0 0 10px 0;">Summaries are written by {{ issue.stats.models|join(", ") or "a language model" }} from each paper's title and abstract only, and may contain errors. Check the original paper before relying on a finding.</p>
+    <p style="margin:0 0 10px 0;">Summaries are written by {{ issue.stats.models|join(", ") or "a language model" }} {% if n_full %}from the full text of {{ n_full }} of the {{ entries|length }} papers (openly published PDF or web page) and from the abstract for the rest{% else %}from each paper's title and abstract only{% endif %}, and may contain errors. Check the original paper before relying on a finding.</p>
     <p style="margin:0;"><a href="{{ site.site_url }}" style="color:#2c5bb8; text-decoration:underline;">Explore every paper screened this month</a></p>
     {% if site.disclaimer %}<p style="margin:12px 0 0 0; font-size:12px;">{{ site.disclaimer }}</p>{% endif %}
   </td></tr>

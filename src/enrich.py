@@ -10,10 +10,14 @@ assessed", two open sources are tried in order:
   2. The paper's own landing page — publishers and central banks expose the
      abstract in standard metadata tags (citation_abstract, dc.description,
      og:description) even when the full text is paywalled.
+  3. The opening of the paper's open text (src/fulltext.py) — for speeches,
+     blog posts and working papers whose page has no abstract tag: the text
+     after an "Abstract" heading in the PDF, or else the first paragraphs.
 
 The source of every recovered abstract is stored (`abstract_source`) and shown
 in the explorer, and a paper is not retried for a week after a failed attempt.
-Only metadata is read: no paywall is bypassed and no full text is downloaded.
+Only openly published pages and documents are read; no paywall or bot check is
+bypassed, so paywalled journals without an open abstract stay excluded.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from html.parser import HTMLParser
 from src.fetchers.http import FetchError, QuotaExceeded, download
 from src.fetchers.openalex import reconstruct_abstract  # noqa: F401 (re-exported)
 from src.fetchers.rss import clean_text
+from src.fulltext import FullTextFinder, opening
 from src.models import normalise_title
 from src.storage import Storage
 
@@ -82,7 +87,8 @@ def abstract_from_html(html: str, min_chars: int) -> str | None:
 
 class Enricher:
     def __init__(self, settings: dict, min_chars: int = 200, use_openalex: bool = True,
-                 use_landing_page: bool = True, max_title_searches: int = 40):
+                 use_landing_page: bool = True, max_title_searches: int = 40,
+                 use_page_text: bool = True, opening_chars: int = 1500):
         # Lookups are best-effort: one quick attempt each, no long retry loops.
         self.settings = {**settings, "max_retries": 1, "request_timeout_seconds": 15}
         self.min_chars = min_chars
@@ -93,6 +99,10 @@ class Enricher:
         self.title_searches_left = max_title_searches
         self.quota_note = None
         self.api_key = os.environ.get("OPENALEX_API_KEY")
+        self.use_page_text = use_page_text
+        self.opening_chars = opening_chars
+        # Short documents (a two-page speech) still count: a lower bar than for write-ups.
+        self.finder = FullTextFinder(self.settings, max_chars=20000, min_chars=max(min_chars, 600))
 
     def _openalex_params(self, **extra) -> dict:
         params = {"select": "title,abstract_inverted_index", **extra}
@@ -126,12 +136,21 @@ class Enricher:
         html = download(paper["url"], self.settings).decode("utf-8", errors="replace")
         return abstract_from_html(html, self.min_chars)
 
+    def from_page_text(self, paper: dict) -> str | None:
+        found = self.finder.find(paper)
+        if not found:
+            return None
+        text = opening(found.text, self.opening_chars)
+        return text if len(text) >= self.min_chars else None
+
     def enrich(self, paper: dict) -> tuple[str, str] | None:
         steps = []
         if self.use_openalex:
             steps.append(("OpenAlex", self.from_openalex))
         if self.use_landing_page and not paper["url"].lower().endswith(".pdf"):
             steps.append(("publisher page", self.from_landing_page))
+        if self.use_page_text:
+            steps.append(("opening of the text", self.from_page_text))
         for name, step in steps:
             if name == "OpenAlex" and not self.use_openalex:
                 continue
@@ -150,16 +169,17 @@ class Enricher:
         return None
 
 
-def run_enrichment(storage: Storage, settings: dict, cfg: dict) -> dict:
+def run_enrichment(storage: Storage, settings: dict, cfg: dict, retry_all: bool = False) -> dict:
     """Try to recover abstracts for papers that lack one. Returns a summary."""
     ecfg = cfg.get("enrichment", {})
     if not ecfg.get("enabled", True):
         return {"tried": 0, "found": Counter(), "by_source": {}}
     min_chars = cfg["prefilter"]["min_abstract_chars"]
-    retry_before = (datetime.now(timezone.utc) - timedelta(days=ecfg.get("retry_after_days", 7))).isoformat()
+    retry_before = (datetime.now(timezone.utc) - timedelta(days=0 if retry_all else ecfg.get("retry_after_days", 7))).isoformat()
     todo = storage.papers_missing_abstract(min_chars, retry_before)[: ecfg.get("max_per_run", 300)]
     enricher = Enricher(settings, min_chars, ecfg.get("openalex", True), ecfg.get("landing_page", True),
-                        ecfg.get("max_title_searches", 40))
+                        ecfg.get("max_title_searches", 40), ecfg.get("page_text", True),
+                        cfg["screening"].get("max_abstract_chars", 1500))
     found, by_source = Counter(), {}
     for i, paper in enumerate(todo, 1):
         result = enricher.enrich(paper)

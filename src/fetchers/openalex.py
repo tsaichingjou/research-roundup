@@ -162,7 +162,8 @@ def _fetch_journal(source: dict, settings: dict, base: list[str]) -> list[Paper]
 def fetch(source: dict, settings: dict) -> list[Paper]:
     lookback = source.get("lookback_days", 60)
     since = (datetime.now(timezone.utc) - timedelta(days=lookback)).date().isoformat()
-    base = [f"from_publication_date:{since}"]
+    # Central banks also deposit replication datasets in OpenAlex: papers only.
+    base = [f"from_publication_date:{since}", "type:!dataset"]
     if source.get("require_abstract", True):
         base.append("has_abstract:true")
 
