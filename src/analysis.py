@@ -269,7 +269,12 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
             except LLMAuthError:
                 raise
             except LLMError as exc:
-                log.error("Skipping '%s': %s", p["title"][:60], exc)
+                previous = storage.get_analysis(p["uid"]) if rewrite else None
+                if previous is None:
+                    log.error("Skipping '%s': %s", p["title"][:60], exc)
+                    continue
+                log.warning("Keeping the previous write-up of '%s': %s", p["title"][:60], exc)
+                entries.append({"paper": p, "analysis": previous})
                 continue
             storage.save_analysis(p["uid"], analysis, getattr(analysis_client, "model", None))
         entries.append({"paper": p, "analysis": analysis})

@@ -72,6 +72,7 @@ class GeminiClient:
         if not models:
             raise LLMError("No Gemini model configured")
         self.candidates = list(models)
+        self.exhausted: set[str] = set()   # models skipped for the rest of the run
         self.model = self.candidates[0]
         self.temperature = temperature
         self.min_interval = min_interval_seconds
@@ -100,6 +101,8 @@ class GeminiClient:
                 text = self._post(body)
                 return parse_json(text)
             except _ModelUnavailable as exc:
+                if exc.lasting:
+                    self.exhausted.add(self.model)
                 self._next_model(str(exc))
             except (json.JSONDecodeError, ValueError) as exc:
                 # One retry for malformed JSON before giving up.
@@ -109,8 +112,10 @@ class GeminiClient:
 
     def prefer_first(self) -> None:
         """Go back to the first (preferred) model, e.g. before each write-up, so
-        one busy spell does not leave the rest of the run on a fallback model."""
-        self.model = self.candidates[0]
+        one busy spell does not leave the rest of the run on a fallback model.
+        Models that timed out or used up their daily quota stay skipped."""
+        alive = [m for m in self.candidates if m not in self.exhausted]
+        self.model = alive[0] if alive else self.candidates[-1]
 
     def ping(self, model: str) -> tuple[bool, float, str]:
         """Send a tiny JSON request to one model. Returns (ok, seconds, message)."""
@@ -148,13 +153,14 @@ class GeminiClient:
         self._last_call = time.monotonic()
 
     def _next_model(self, reason: str) -> None:
-        idx = self.candidates.index(self.model)
-        if idx + 1 >= len(self.candidates):
+        rest = [m for m in self.candidates[self.candidates.index(self.model) + 1:]
+                if m not in self.exhausted]
+        if not rest:
             raise LLMError(f"No configured Gemini model is available ({reason}). "
                            "Run `python main.py models` to see which models your key can use.")
         log.warning("Model %s unavailable (%s); falling back to %s",
-                    self.model, reason, self.candidates[idx + 1])
-        self.model = self.candidates[idx + 1]
+                    self.model, reason, rest[0])
+        self.model = rest[0]
 
     def _post(self, body: dict) -> str:
         url = f"{API_ROOT}/models/{self.model}:generateContent"
@@ -171,7 +177,7 @@ class GeminiClient:
                 # unavailable (overloaded, or too slow on the free tier): fall back.
                 timeouts += 1
                 if timeouts >= self.max_timeouts:
-                    raise _ModelUnavailable(f"timed out {timeouts}x after {self.timeout}s")
+                    raise _ModelUnavailable(f"timed out {timeouts}x after {self.timeout}s", lasting=True)
                 self._sleep_backoff(attempt, f"timeout after {self.timeout}s")
                 continue
             except requests.RequestException as exc:
@@ -204,7 +210,12 @@ class GeminiClient:
                 if timeouts >= self.max_timeouts:
                     raise _ModelUnavailable(f"HTTP {resp.status_code} {timeouts}x (overloaded)")
             # 429 (rate limit) and transient 5xx: back off and retry
-            self._sleep_backoff(attempt, f"HTTP {resp.status_code}", _retry_delay(resp))
+            delay = _retry_delay(resp)
+            if resp.status_code == 429 and delay is not None and delay > MAX_RATE_LIMIT_WAIT:
+                # A wait of hours means the model's daily free quota is used up:
+                # move to the next model instead of stalling the run.
+                raise _ModelUnavailable(f"daily quota used up (retry in {delay / 3600:.0f}h)", lasting=True)
+            self._sleep_backoff(attempt, f"HTTP {resp.status_code}", delay)
         raise LLMError(f"Gemini call failed after {self.max_retries} attempts")
 
     def _sleep_backoff(self, attempt: int, reason: str, suggested: float | None = None) -> None:
@@ -231,7 +242,16 @@ class GeminiClient:
 
 
 class _ModelUnavailable(Exception):
-    pass
+    """The current model cannot serve this request. `lasting` marks failures that
+    will not clear within the run (timeouts, daily quota): the model is then
+    skipped for the rest of the run instead of being tried again."""
+
+    def __init__(self, message: str, lasting: bool = False):
+        super().__init__(message)
+        self.lasting = lasting
+
+
+MAX_RATE_LIMIT_WAIT = 120     # seconds; longer suggested waits mean the daily quota is gone
 
 
 def _retry_delay(resp: requests.Response) -> float | None:
