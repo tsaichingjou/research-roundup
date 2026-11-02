@@ -152,3 +152,14 @@ def test_datasets_are_excluded_and_old_exclusions_rechecked(tmp_path):
     s.save_screening([{"uid": uid, "status": "excluded", "reason": "no abstract available"}], model=None)
     analysis.run_screening(s, FakeClient(), CFG)
     assert s.get_screening()[uid]["reason"] == "dataset, not a paper"
+
+
+def test_finder_follows_linked_pdf_on_short_landing_page(monkeypatch):
+    page = (f'<html><body><h1>{TITLE}</h1><p>{BODY[:600]}</p>'
+            f'<a href="https://other.org/ad.pdf">Brochure</a><a href="/publ/work1383.pdf">Full text</a></body></html>')
+    monkeypatch.setattr(fulltext.requests, "get", fake_get({
+        "bis.org/publications/": (page.encode(), "text/html"),
+        "bis.org/publ/work1383.pdf": (make_pdf(TITLE + ". " + BODY), "application/pdf"),
+    }))
+    found = fulltext.FullTextFinder({}).find({"url": "https://www.bis.org/publications/working-paper-1383", "title": TITLE})
+    assert found and found.kind == "PDF" and found.url.endswith("work1383.pdf")

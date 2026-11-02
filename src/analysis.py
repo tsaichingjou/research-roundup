@@ -256,6 +256,7 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
     for i, p in enumerate(selected, 1):
         analysis = None if rewrite else storage.get_analysis(p["uid"])
         if analysis is None:
+            getattr(analysis_client, "prefer_first", lambda: None)()
             log.info("Writing up %d/%d with %s: %s", i, len(selected),
                      getattr(analysis_client, "model", "LLM"), p["title"][:70])
             full_text = None

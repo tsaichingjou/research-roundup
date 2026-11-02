@@ -23,7 +23,7 @@ import logging
 import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -59,6 +59,7 @@ class _PageParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.pdf_url: str | None = None
+        self.pdf_links: list[str] = []      # <a href="...pdf"> links, in page order
         self.paragraphs: list[str] = []
         self._skip = 0
         self._buf: list[str] = []
@@ -68,6 +69,8 @@ class _PageParser(HTMLParser):
         a = {k.lower(): (v or "") for k, v in attrs}
         if tag == "meta" and (a.get("name") or "").lower() == "citation_pdf_url" and a.get("content"):
             self.pdf_url = self.pdf_url or a["content"]
+        if tag == "a" and ".pdf" in a.get("href", "").lower() and not self._skip:
+            self.pdf_links.append(a["href"])
         if tag in self.SKIP:
             self._skip += 1
         elif tag in self.BLOCK:
@@ -94,13 +97,19 @@ class _PageParser(HTMLParser):
 
 def html_text(html: str) -> tuple[str, str | None]:
     """Readable text of an HTML page and the PDF link it declares (if any)."""
+    text, pdf, _ = parse_page(html)
+    return text, pdf
+
+
+def parse_page(html: str) -> tuple[str, str | None, list[str]]:
+    """Readable text, declared PDF (citation_pdf_url) and linked PDFs of a page."""
     parser = _PageParser()
     try:
         parser.feed(html)
         parser._flush()
     except Exception:  # malformed markup: keep what was parsed
         pass
-    return "\n\n".join(parser.paragraphs), parser.pdf_url
+    return "\n\n".join(parser.paragraphs), parser.pdf_url, parser.pdf_links
 
 
 def pdf_text(data: bytes, max_pages: int = 40) -> str:
@@ -216,13 +225,24 @@ class FullTextFinder:
             html = data.decode("utf-8", errors="replace")
             if _BLOCKED.search(html[:20000]) and len(html) < 60000:
                 return None
-            text, pdf = html_text(html)
+            text, pdf, links = parse_page(html)
             # A landing page that declares a PDF: the PDF is the paper; the page
             # usually only holds the abstract.
             if pdf and depth == 0:
                 found = self._read(urljoin(final_url, pdf), title, depth + 1)
                 if found:
                     return found
+            # Otherwise a short landing page (BIS, ECB) usually links the paper's
+            # PDF: try the first PDFs on the same site, keeping one only if it is
+            # about this paper (title check) and longer than the page itself.
+            if depth == 0 and len(text) < 15000:
+                host = urlparse(final_url).netloc
+                same_site = [u for u in dict.fromkeys(urljoin(final_url, h) for h in links)
+                             if urlparse(u).netloc == host][:2]
+                for link in same_site:
+                    found = self._read(link, title, depth + 1)
+                    if found and found.kind == "PDF" and len(found.text) > len(text):
+                        return found
             # Fed in Print records link to the publishing bank's own page.
             if "fedinprint.org/item/" in final_url and depth == 0 and not final_url.endswith("/original"):
                 found = self._read(final_url.rstrip("/") + "/original", title, depth + 1)

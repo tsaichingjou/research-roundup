@@ -107,6 +107,11 @@ class GeminiClient:
                 text = self._post(body)
                 return parse_json(text)
 
+    def prefer_first(self) -> None:
+        """Go back to the first (preferred) model, e.g. before each write-up, so
+        one busy spell does not leave the rest of the run on a fallback model."""
+        self.model = self.candidates[0]
+
     def ping(self, model: str) -> tuple[bool, float, str]:
         """Send a tiny JSON request to one model. Returns (ok, seconds, message)."""
         body = {"contents": [{"role": "user", "parts": [{"text": 'Return {"ok": true}'}]}],
