@@ -11,20 +11,29 @@ BODY = ("Offshore forwards and exchange rate transmission in emerging markets ar
 
 
 def make_pdf(text: str) -> bytes:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas
-
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    y = 800
-    for line in [text[i:i + 90] for i in range(0, len(text), 90)]:
-        c.drawString(40, y, line)
-        y -= 14
-        if y < 40:
-            c.showPage()
-            y = 800
-    c.save()
-    return buf.getvalue()
+    """A minimal text PDF, written by hand so the tests need no PDF library."""
+    lines = [text[i:i + 90] for i in range(0, len(text), 90)]
+    pages = [lines[i:i + 50] for i in range(0, len(lines), 50)]
+    objs = ["<< /Type /Catalog /Pages 2 0 R >>", None,
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    kids = []
+    for page in pages:
+        body = "BT /F1 10 Tf 40 800 Td 14 TL " + " ".join(
+            "(" + ln.replace("\\", "").replace("(", "").replace(")", "") + ") '" for ln in page) + " ET"
+        objs.append(f"<< /Length {len(body)} >>\nstream\n{body}\nendstream")
+        objs.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+                    f"/Resources << /Font << /F1 3 0 R >> >> /Contents {len(objs)} 0 R >>")
+        kids.append(f"{len(objs)} 0 R")
+    objs[1] = f"<< /Type /Pages /Kids [{' '.join(kids)}] /Count {len(kids)} >>"
+    out, offsets = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{o}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    out += b"".join(f"{off:010d} 00000 n \n".encode() for off in offsets)
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode()
+    return out
 
 
 class Resp:
