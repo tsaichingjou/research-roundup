@@ -145,12 +145,20 @@ python -m pytest -q                  # run tests (no network or API key needed)
 | AER, Econometrica, QJE, REStud | One source per journal | Crossref API by ISSN (90-day look-back, as journals register DOIs in batches) |
 | JPE | **Partial**: only papers whose abstract can be recovered (about 40% in testing); see below | Crossref API by ISSN + OpenAlex for abstracts |
 | NBER | All new working papers | NBER RSS |
-| BPEA | Spring and autumn editions | OpenAlex API by ISSN (1-year look-back; no feed exists, and Crossref returned nothing) |
+| BPEA | **None so far**: spring and autumn editions, but see below | OpenAlex API by ISSN (1-year look-back; no feed exists, and Crossref returned nothing) |
 | IMF | IMF Working Papers | Crossref API by ISSN (the IMF RSS endpoint returns 404) |
 | BIS | BIS Working Papers | BIS RSS |
 | 12 Federal Reserve regional banks + Board | One source per bank | Fed in Print RSS (the Federal Reserve System's own catalogue) |
 | G10 central banks | ECB, Bank of Japan, Bank of England, Bank of Canada, Bundesbank, Banque de France, Banca d'Italia, De Nederlandsche Bank, National Bank of Belgium, Riksbank, SNB (Fed via Fed in Print) | OpenAlex API, one query per bank; BIS Central Bank Research Hub RSS as a supplement |
 | European national central banks | 25 banks, from Banco de España to Norges Bank and the NBP | Same |
+
+**Why BPEA shows no papers.** BPEA publishes two editions a year and offers
+no feed, and Crossref returns none of its recent papers. The OpenAlex query
+(both ISSNs, with a fallback by journal name, over a full year) runs in every
+fetch but has so far returned no records, so the source currently contributes
+nothing; it is logged as "0 items" rather than failing silently, and will pick
+the papers up once OpenAlex indexes them. Reading brookings.edu directly would
+close the gap; it was left out to keep every source on a documented API or feed.
 
 **Why JPE is only partly covered.** The brief allows a source to be dropped
 for a cycle when abstracts are unavailable, provided this is documented. JPE
@@ -339,23 +347,33 @@ replaces that month's issue, but earlier issues are never changed.
 
 ## Evaluating the classification
 
-The EM / DM / Transversal labels are checked against human labels rather than
-taken on trust (`src/evaluation.py`):
+The EM / DM / Transversal labels are not taken on trust (`src/evaluation.py`).
 
-- **Blind, stratified sample.** `export-labels` draws ~15 papers per LLM class
-  (DM papers far outnumber EM ones, so a random sample would leave EM recall
-  resting on a handful of papers) and writes only titles and abstracts, so the
-  annotator is not anchored by the LLM's answer. Labelling rules:
-  `evaluation/LABELLING_GUIDE.md`.
-- **Dev / test split.** Errors on `dev` rows may be used to improve the prompt;
-  the reported score comes from `test` rows not looked at while tuning.
-- **Metrics.** Accuracy with a Wilson 95% interval, confusion matrix,
-  per-class precision / recall / F1, macro-F1 (robust to class imbalance) and
-  Cohen's κ (agreement beyond chance).
-- **Consistency without labels.** The screening model and the writing model
-  label each selected paper independently; their agreement rate is reported too.
+**Two-model agreement (the reported check).** `python main.py agreement` takes
+a sample of scored papers, stratified by the screening model's label (about 35
+per class, so EM is not crowded out by the much larger DM group), and has a
+second, stronger model label them again, independently, from the same prompt
+and inputs. `evaluation/report.txt` gives the agreement rate with a 95%
+interval, Cohen's κ, agreement per class, the same rate re-weighted to the
+class mix of all screened papers, the confusion matrix, and how far apart the
+two models' relevance scores are. Run it from the Actions tab (mode
+*evaluate*); results are committed to `evaluation/`.
 
-Results: see `evaluation/report.txt`.
+Agreement is not accuracy: two models can make the same mistake, and models
+from one family may share a bias. What it does show is how stable the labels
+are and which classes get confused, and it narrows human review to where it
+matters: `evaluation/disagreements.csv` lists every paper on which the models
+disagree, with both models' reasons and an empty `human_label` column.
+
+**Accuracy against human labels (ready, not yet run).** Measuring accuracy
+needs a reviewer with an economics background. The tooling is in place:
+`export-labels` writes a blind, stratified sample (titles and abstracts only, no
+model labels, so the reviewer is not anchored), `evaluation/LABELLING_GUIDE.md`
+gives the rules, and `evaluate` reports accuracy with a Wilson 95% interval,
+per-class precision / recall / F1, macro-F1 and κ, on a dev / test split so
+that prompt tuning on `dev` errors does not inflate the `test` score. The
+cheapest first step is to label the disagreements file: where the two models
+agree, a shared error is less likely.
 
 ## Roadmap
 

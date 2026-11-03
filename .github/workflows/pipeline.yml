@@ -18,9 +18,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "daily = fetch and score; monthly = fetch, write up and publish last month's issue; republish = retry missing abstracts and rewrite last month's issue"
+        description: "daily = fetch and score; monthly = fetch, write up and publish last month's issue; republish = retry missing abstracts and rewrite last month's issue; evaluate = two-model agreement check on the classification"
         type: choice
-        options: [daily, monthly, republish]
+        options: [daily, monthly, republish, evaluate]
         default: monthly
 
 concurrency:
@@ -92,6 +92,13 @@ jobs:
           python main.py enrich --retry-all
           python main.py publish --rewrite
 
+      - name: Evaluate — second model re-labels a sample, agreement report
+        id: evaluate
+        if: steps.mode.outputs.mode == 'evaluate'
+        run: |
+          python main.py agreement
+          python main.py build
+
       # Save whatever was fetched even if a later step failed, so no work is lost.
       - name: Commit database and site
         if: always() && steps.fetch.outcome == 'success'
@@ -100,6 +107,7 @@ jobs:
           git config user.email "research-roundup-bot@users.noreply.github.com"
           git add -f data/published.db
           [ -d docs ] && git add -f docs
+          [ -d evaluation ] && git add -f evaluation
           if git diff --cached --quiet; then
             echo "Nothing changed."
           else

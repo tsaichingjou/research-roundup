@@ -87,3 +87,25 @@ def test_evaluate_without_labels_raises(tmp_path):
     evaluation.export_sample(store, path, per_class=2)
     with pytest.raises(ValueError):
         evaluation.evaluate(store, path)
+
+
+def test_model_agreement_finds_disagreements(tmp_path):
+    store = _store_with_screening(tmp_path)           # 6 papers per class, labelled by model A
+
+    class ModelB(FakeClient):
+        model = "model-b"
+
+        def generate_json(self, prompt, system=""):
+            out = super().generate_json(prompt, system)
+            for item in out:                          # B calls every EM paper Transversal
+                if item["market_focus"] == "em":
+                    item["market_focus"] = "transversal"
+            return out
+    res = evaluation.model_agreement(store, ModelB(), CFG, per_class=4)
+    assert res["n"] == 12 and res["model_b"] == "model-b"
+    assert res["metrics"]["accuracy"] == pytest.approx(8 / 12)
+    assert res["agree_by_class_a"] == {"EM": 0.0, "DM": 1.0, "Transversal": 1.0}
+    n = evaluation.write_disagreements(res, tmp_path / "d.csv")
+    assert n == 4
+    report = evaluation.format_agreement(res)
+    assert "not accuracy" in report and "Disagreements (4)" in report

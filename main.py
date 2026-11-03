@@ -35,7 +35,8 @@ sys.path.insert(0, str(ROOT))
 from src.analysis import load_analysis_config, provisional_periods, run_analysis, run_screening  # noqa: E402
 from src.enrich import run_enrichment  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
-from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
+from src.evaluation import (evaluate, export_sample, format_agreement, format_report,  # noqa: E402
+                            model_agreement, write_disagreements)  # noqa: E402
 from src.issues import publish_issue  # noqa: E402
 from src.llm import GeminiClient, LLMError  # noqa: E402
 from src.pipeline import check_sources, load_config, run_fetch  # noqa: E402
@@ -150,6 +151,9 @@ def main() -> int:
     p_ev = sub.add_parser("evaluate", help="Compare LLM classification with human labels")
     p_ev.add_argument("--rerun", action="store_true",
                       help="Re-classify the labelled papers now with the current prompt")
+
+    p_ag = sub.add_parser("agreement", help="Re-label a sample with a second model and report agreement")
+    p_ag.add_argument("--per-class", type=int, default=35)
 
     p_pub = sub.add_parser("publish", help="Analyse, freeze this month's issue and build the site")
     p_pub.add_argument("--rewrite", action="store_true",
@@ -268,6 +272,29 @@ def main() -> int:
         print(report)
         (ROOT / "evaluation" / "report.txt").write_text(report + "\n", encoding="utf-8")
         print("\nSaved to evaluation/report.txt")
+        return 0
+
+    if args.command == "agreement":
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        llm = acfg["llm"]
+        # Model B must differ from the screening model, or the check is meaningless.
+        second = [m for m in llm["analysis_models"] if m not in llm["screening_models"]]
+        client = GeminiClient(models=second, temperature=llm.get("temperature", 0.2),
+                              min_interval_seconds=llm.get("min_interval_seconds", 4),
+                              timeout=llm.get("timeout_seconds", 90))
+        try:
+            result = model_agreement(storage, client, acfg, per_class=args.per_class)
+        except (LLMError, ValueError) as exc:
+            print(f"ERROR: {exc}")
+            print_usage(client)
+            return 1
+        report = format_agreement(result)
+        print(report)
+        out = ROOT / "evaluation"
+        (out / "report.txt").write_text(report + "\n", encoding="utf-8")
+        n = write_disagreements(result, out / "disagreements.csv")
+        print_usage(client)
+        print(f"\nSaved evaluation/report.txt and {n} disagreements to evaluation/disagreements.csv")
         return 0
 
     if args.command == "screen":

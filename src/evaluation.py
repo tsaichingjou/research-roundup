@@ -197,3 +197,120 @@ def format_report(result: dict) -> str:
             if r.get("notes"):
                 lines.append(f"        your note: {r['notes']}")
     return "\n".join(lines)
+
+
+# --- two-model agreement (no human labels needed) -------------------------------------
+AGREEMENT_FIELDS = ["id", "source", "title", "abstract", "label_a", "label_b",
+                    "reason_a", "reason_b", "human_label"]
+
+
+def model_agreement(storage: Storage, client: JSONModel, cfg: dict, per_class: int = 35,
+                    seed: int = 7, batch_size: int = 20) -> dict:
+    """Re-label a stratified sample with a second, independent model and compare.
+
+    Model A is the screening model (labels stored at screening time); model B is
+    `client`, a different and stronger model, run now with the same prompt and
+    the same inputs (title, source, abstract). Agreement is not accuracy: two
+    models can share a mistake. It does show how stable the labels are, which
+    classes the models confuse, and which papers a human should look at first
+    (the disagreements, written out with both models' reasons).
+
+    The sample is stratified by model A's label so EM is not crowded out; the
+    agreement rate is also re-weighted by each class's share of all screened
+    papers, to estimate agreement on the full population."""
+    papers = {p["uid"]: p for p in storage.all_papers()}
+    screened = [s for s in storage.get_screening().values()
+                if s["status"] == "scored" and s["uid"] in papers and s.get("market_focus")]
+    shares = Counter(s["market_focus"] for s in screened)
+    rng = random.Random(seed)
+    sample = []
+    for label in LABELS:
+        pool = sorted((s for s in screened if s["market_focus"] == label), key=lambda s: s["uid"])
+        sample += rng.sample(pool, min(per_class, len(pool)))
+    by_uid = {s["uid"]: s for s in sample}
+
+    fresh = screen([papers[s["uid"]] for s in sample], client,
+                   {**cfg, "screening": {**cfg["screening"], "batch_size": batch_size}})
+    b = {r["uid"]: r for r in fresh}
+    rows = []
+    for uid, r in b.items():
+        a, p = by_uid[uid], papers[uid]
+        rows.append({"id": uid, "source": p["source_name"], "title": p["title"], "abstract": p["abstract"],
+                     "label_a": a["market_focus"], "label_b": r["market_focus"],
+                     "reason_a": a.get("reason", ""), "reason_b": r.get("reason", ""), "human_label": "",
+                     "score_a": a.get("score"), "score_b": r.get("score")})
+    if not rows:
+        raise ValueError("The second model returned no labels.")
+
+    m = compute_metrics([(r["label_b"], r["label_a"]) for r in rows])     # rows = model B
+    per_class = {}
+    for label in LABELS:
+        sub = [r for r in rows if r["label_a"] == label]
+        if sub:
+            per_class[label] = sum(r["label_a"] == r["label_b"] for r in sub) / len(sub)
+    total = sum(shares[l] for l in per_class)
+    weighted = sum(per_class[l] * shares[l] / total for l in per_class) if total else None
+    scored = [(r["score_a"], r["score_b"]) for r in rows if r["score_a"] is not None and r["score_b"] is not None]
+    return {
+        "model_a": sorted({s.get("model") for s in sample if s.get("model")}),
+        "model_b": getattr(client, "model", "?"),
+        "n_sample": len(sample), "n": len(rows), "metrics": m,
+        "agree_by_class_a": per_class, "population_shares": dict(shares), "weighted_agreement": weighted,
+        "score_mad": sum(abs(x - y) for x, y in scored) / len(scored) if scored else None,
+        "score_within_1": sum(abs(x - y) <= 1 for x, y in scored) / len(scored) if scored else None,
+        "rows": rows,
+    }
+
+
+def write_disagreements(result: dict, path: Path) -> int:
+    rows = [r for r in result["rows"] if r["label_a"] != r["label_b"]]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=AGREEMENT_FIELDS, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(rows)
+    return len(rows)
+
+
+def format_agreement(result: dict) -> str:
+    m = result["metrics"]
+    lo, hi = m["accuracy_ci"]
+    a = ", ".join(result["model_a"]) or "screening model"
+    lines = [
+        "EM / DM / Transversal classification: agreement between two independent models",
+        "",
+        f"Model A (screening, labels stored when each paper was scored): {a}",
+        f"Model B (stronger model, re-labelled now with the same prompt and inputs): {result['model_b']}",
+        f"Sample: {result['n']} papers, stratified by model A's label "
+        f"(up to {max(Counter(r['label_a'] for r in result['rows']).values())} per class)",
+        "",
+        "This measures agreement, not accuracy: two models can make the same mistake.",
+        "Disagreements are listed in evaluation/disagreements.csv with both models'",
+        "reasons, as the papers a human reviewer should check first.",
+        "",
+        f"Agreement        {m['accuracy'] * 100:5.1f}%   (95% CI {lo * 100:.0f}-{hi * 100:.0f}%)",
+        f"Cohen's kappa    {m['kappa']:.3f}   (agreement beyond chance; >0.8 is usually read as strong)",
+    ]
+    if result["weighted_agreement"] is not None:
+        shares = result["population_shares"]
+        tot = sum(shares.values())
+        lines.append(f"Re-weighted      {result['weighted_agreement'] * 100:5.1f}%   (by class share of all "
+                     f"{tot} screened papers: " + ", ".join(f"{l} {shares.get(l, 0) / tot * 100:.0f}%" for l in LABELS) + ")")
+    lines += ["", "Agreement by model A's label:"]
+    for l, v in result["agree_by_class_a"].items():
+        n = sum(r["label_a"] == l for r in result["rows"])
+        lines.append(f"  {l:<12} {v * 100:5.1f}%   (n={n})")
+    lines += ["", "Confusion matrix (rows = model B, columns = model A)",
+              "               " + "".join(f"{l:>13}" for l in LABELS)]
+    for h in LABELS:
+        lines.append(f"  {h:<12} " + "".join(f"{m['confusion'][h][p]:>13}" for p in LABELS))
+    if result["score_mad"] is not None:
+        lines += ["", "Relevance score (0-10), same papers:",
+                  f"  mean absolute difference {result['score_mad']:.2f} points; "
+                  f"within 1 point: {result['score_within_1'] * 100:.0f}%"]
+    dis = [r for r in result["rows"] if r["label_a"] != r["label_b"]]
+    if dis:
+        lines += ["", f"Disagreements ({len(dis)}):"]
+        for r in dis:
+            lines.append(f"  A={r['label_a']:<11} B={r['label_b']:<11} {r['title'][:72]}")
+    return "\n".join(lines)
