@@ -8,9 +8,9 @@ EM / DM / Transversal market classification.
 **Live newsletter and explorer:** <https://tsaichingjou.github.io/research-roundup/>
 (each issue is under `issues/YYYY-MM.html`; the explorer links to it).
 
-The agent runs itself on GitHub Actions: every Monday it fetches and scores the
-week's new publications, and on the 1st of each month it selects 5–8 papers,
-writes them up and publishes the issue to GitHub Pages.
+The agent runs itself on GitHub Actions: every day it fetches and scores new
+publications, and on the 5th of each month it closes the month that just ended,
+selects 5–8 papers, writes them up and publishes the issue to GitHub Pages.
 
 ## Architecture
 
@@ -27,7 +27,7 @@ sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screenin
 | `src/fetchers/` | One module per source *type*: `rss.py` for any RSS/RDF/Atom feed, `crossref.py` for journals with an ISSN (Crossref API), `openalex.py` for works by institution or ISSN (OpenAlex API), `http.py` for shared download/retry logic. |
 | `src/storage.py` | SQLite storage with de-duplication by URL **and** by normalised title, plus a `fetch_log` table recording every run. |
 | `src/pipeline.py` | Runs all enabled sources; a failing source is logged and skipped, never stops the run. |
-| `config/analysis.yaml` | LLM models, time window, pre-filter rules, screening batch size and selection rules. |
+| `config/analysis.yaml` | LLM models, publish day, pre-filter rules, screening batch size and selection rules. |
 | `src/llm.py` | Gemini REST client: JSON mode, throttling, back-off on rate limits, model fallback. |
 | `src/prompts.py` | Screening and analysis prompts, including the EM / DM / Transversal definitions. |
 | `src/enrich.py` | Recovers missing abstracts from OpenAlex, publisher pages or the opening of the paper's text before papers are written off. |
@@ -253,11 +253,12 @@ abstract is scored in batches of 8 (relevance 0–10, market focus, topic); only
 the 5–8 selected papers get the full write-up. This keeps a monthly run to
 roughly 20–30 LLM calls, inside the Gemini free tier.
 
-**Pre-filter.** Papers without a usable abstract (common for journal articles
-behind paywalls, whose Crossref records often omit it) and non-research items
-(comments, replies, errata) are excluded before any LLM call. Every exclusion
-is recorded with its reason, and `analyse` prints coverage per source, which
-documents where fallbacks were needed.
+**Pre-filter.** Non-research items (comments, replies, errata, editorial
+notices, data deposits) are excluded before any LLM call. Papers still without
+a usable abstract after the look-ups described above are not scored; they get a
+market-focus label from their title only and cannot be selected. Every
+exclusion is recorded with its reason, and `analyse` prints coverage per source,
+which documents where fallbacks were needed.
 
 **Selection.** Highest scores first, at most 2 papers per source so one prolific
 institution cannot fill the issue, with a minimum score of 6/10 (relaxed only if
@@ -381,4 +382,4 @@ agree, a shared error is less likely.
 2. ~~LLM analysis module — relevance score, summary, key takeaways, EM/DM/Transversal with rationale~~
 3. ~~Responsive, email-safe HTML newsletter and interactive explorer~~
 4. ~~Remaining sources: G10 and European central banks, 12 regional Fed banks, BPEA~~
-5. ~~Weekly fetch / monthly publish with GitHub Actions, deployed to GitHub Pages~~
+5. ~~Daily fetch / monthly publish with GitHub Actions, deployed to GitHub Pages~~
