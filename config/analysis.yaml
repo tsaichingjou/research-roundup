@@ -53,6 +53,7 @@ prefilter:
     - "^obituary"
     - "^replication (package|data|files|materials|code)"   # datasets deposited by central banks
     - "^(code and data|data and code|data for|supplementary)"
+    - "turnaround times$"                                  # journal editorial notices
 
 screening:
   batch_size: 8               # papers per screening call

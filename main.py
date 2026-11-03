@@ -276,7 +276,8 @@ def main() -> int:
             return 1
         print_usage(screener)
         print(f"\nScreening: {r['new']} new papers, {r['scored']} scored, {r['excluded']} excluded"
-              + (f", {r['unscored']} left for the next run" if r["unscored"] else ""))
+              + (f", {r['unscored']} left for the next run" if r["unscored"] else "")
+              + (f"; {r['title_only']} without an abstract labelled from their title" if r.get("title_only") else ""))
         return 0
 
     if args.command in ("models", "check", "analyse", "analyze"):

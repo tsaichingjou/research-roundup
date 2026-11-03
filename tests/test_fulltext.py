@@ -163,3 +163,25 @@ def test_finder_follows_linked_pdf_on_short_landing_page(monkeypatch):
     }))
     found = fulltext.FullTextFinder({}).find({"url": "https://www.bis.org/publications/working-paper-1383", "title": TITLE})
     assert found and found.kind == "PDF" and found.url.endswith("work1383.pdf")
+
+
+def test_papers_without_abstract_get_title_label_but_are_never_selected(tmp_path):
+    store = make_store(tmp_path, [("jpe", "Labor Markets and Immigration [EM] score=10", ""),
+                                  ("aer", "Rates [DM] score=8", "We study rates and spreads. " * 10)])
+    report = analysis.run_analysis(store, FakeClient(), CFG)
+    st = {s["uid"]: s for s in store.get_screening().values()}
+    title_only = [s for s in st.values() if s["status"] == "title_only"]
+    assert len(title_only) == 1 and title_only[0]["market_focus"] == "EM" and title_only[0]["score"] is None
+    assert [e["paper"]["source_id"] for e in report["entries"]] == ["aer"]
+    assert report["coverage"]["jpe"]["classified from title"] == 1
+
+
+def test_title_only_paper_is_rescored_once_abstract_recovered(tmp_path):
+    store = make_store(tmp_path, [("jpe", "Rates Abroad [EM] score=9", "")])
+    analysis.run_screening(store, FakeClient(), CFG)
+    uid = store.all_papers()[0]["uid"]
+    assert store.get_screening()[uid]["status"] == "title_only"
+    with store._conn() as conn:
+        conn.execute("UPDATE papers SET abstract=? WHERE uid=?", ("We study rates abroad. " * 10, uid))
+    analysis.run_screening(store, FakeClient(), CFG)
+    assert store.get_screening()[uid]["status"] == "scored" and store.get_screening()[uid]["score"] == 9

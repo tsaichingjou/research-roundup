@@ -147,8 +147,11 @@ was kept with partial coverage rather than dropped, for these reasons:
    in the first run.
 
 So JPE papers with an OpenAlex abstract are screened like any other paper,
-and the rest are listed in the explorer as "not assessed: no abstract
-available" and counted in each newsletter's "How this issue was made" note.
+and the rest get a market-focus label from their title alone (one cheap batch
+call to the lite model). That keeps them in the coverage chart and the explorer,
+marked "labelled from title", but they are not scored and cannot be selected:
+a title is too little to rank on. Each newsletter's "How this issue was made"
+note says how many there were.
 Missing abstracts are looked up again every week, as OpenAlex keeps adding
 records. The trade-off is that a relevant JPE paper can be missed in the month
 it appears; to drop JPE instead, set `enabled: false` in `config/sources.yaml`.

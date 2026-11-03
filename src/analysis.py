@@ -120,6 +120,39 @@ def screen(papers: list[dict], client: JSONModel, cfg: dict, on_batch=None) -> l
     return results
 
 
+def classify_titles(papers: list[dict], client: JSONModel, cfg: dict) -> list[dict]:
+    """Market-focus label from the title alone, for papers with no abstract.
+
+    They get status "title_only" and no score: the label lets the dashboard show
+    every publication by market focus, but a title is too little to rank on, so
+    these papers are never selected for the newsletter."""
+    batch_size = cfg["screening"].get("title_batch_size", 20)
+    results: list[dict] = []
+    for start in range(0, len(papers), batch_size):
+        batch = papers[start:start + batch_size]
+        id_map = {f"p{i + 1}": p["uid"] for i, p in enumerate(batch)}
+        prompt = prompts.title_prompt([{"id": k, "source": p["source_name"], "title": p["title"]}
+                                       for k, p in zip(id_map, batch)])
+        try:
+            response = client.generate_json(prompt, system=prompts.SYSTEM)
+        except LLMAuthError:
+            raise
+        except LLMError as exc:
+            log.error("Title classification batch %d failed: %s", start // batch_size + 1, exc)
+            continue
+        if isinstance(response, dict):
+            response = next((v for v in response.values() if isinstance(v, list)), [])
+        for item in response if isinstance(response, list) else []:
+            uid = id_map.pop(str(item.get("id", "")).strip(), None)
+            market = normalise_market(item.get("market_focus")) if uid else None
+            if market:
+                results.append({"uid": uid, "status": "title_only", "score": None, "market_focus": market,
+                                "topic": str(item.get("topic", "")).strip()[:60],
+                                "reason": str(item.get("reason", "")).strip()[:400]})
+    log.info("Classified %d/%d papers without an abstract from their title", len(results), len(papers))
+    return results
+
+
 # --- 3. Selection -----------------------------------------------------------------
 def select(scored: list[dict], cfg: dict) -> list[dict]:
     """Pick 5-8 papers: highest scores first, at most `max_per_source` per source.
@@ -217,13 +250,21 @@ def run_screening(storage: Storage, client: JSONModel, cfg: dict, now: datetime 
     stale = [p for p in candidates if screened.get(p["uid"], {}).get("reason") == "no abstract available"]
     storage.save_screening([e for e in prefilter(stale, cfg)[1]
                             if e["reason"] != "no abstract available"], model=None)
-    new = [p for p in candidates if p["uid"] not in screened]
+    # New papers, plus title-only papers whose abstract has since been recovered.
+    min_chars = cfg["prefilter"]["min_abstract_chars"]
+    new = [p for p in candidates if p["uid"] not in screened
+           or (screened[p["uid"]]["status"] == "title_only" and len(p.get("abstract") or "") >= min_chars)]
     kept, excluded = prefilter(new, cfg)
     storage.save_screening(excluded, model=None)
-    results = screen(kept, client, cfg,
-                     on_batch=lambda res: storage.save_screening(res, model=getattr(client, "model", None)))
+    model = lambda: getattr(client, "model", None)
+    results = screen(kept, client, cfg, on_batch=lambda res: storage.save_screening(res, model=model()))
+    # Papers still without an abstract get a market-focus label from their title.
+    screened = storage.get_screening()
+    no_abstract = [p for p in candidates if screened.get(p["uid"], {}).get("reason") == "no abstract available"]
+    titled = classify_titles(no_abstract, client, cfg) if no_abstract else []
+    storage.save_screening(titled, model=model())
     return {"new": len(new), "excluded": len(excluded), "scored": len(results),
-            "unscored": len(kept) - len(results)}
+            "unscored": len(kept) - len(results), "title_only": len(titled)}
 
 
 def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
@@ -290,6 +331,8 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
         st = status[p["uid"]]
         if st.get("status") == "scored":
             c["scored"] += 1
+        elif st.get("status") == "title_only":
+            c["classified from title"] += 1
         elif st.get("reason"):
             c["excluded: " + st["reason"]] += 1
     return {

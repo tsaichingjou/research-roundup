@@ -61,7 +61,7 @@ def test_recovered_paper_is_screened_next_run(tmp_path, monkeypatch):
     store.save_papers([Paper(source_id="jpe", source_name="JPE", title="Spreads [EM] score=8",
                              url="https://doi.org/10.1086/9", abstract="")])
     analysis.run_analysis(store, FakeClient(), CFG)
-    assert next(iter(store.get_screening().values()))["reason"] == "no abstract available"
+    assert next(iter(store.get_screening().values()))["status"] == "title_only"
 
     inv = _inverted(LONG)
     monkeypatch.setattr(enrich, "download", _fake_download(

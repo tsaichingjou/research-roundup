@@ -128,8 +128,11 @@
     {% if recovered %}
     <p style="margin:0 0 10px 0;">For {{ recovered }} papers whose feed carried no abstract, a stand-in was recovered before screening: from OpenAlex, the publisher's page, or the opening of the paper's own text.</p>
     {% endif %}
+    {% if n_title_only %}
+    <p style="margin:0 0 10px 0;">{{ n_title_only }} publication{{ " with no abstract anywhere was" if n_title_only == 1 else "s with no abstract anywhere were" }} labelled by market focus from {{ "its title" if n_title_only == 1 else "their titles" }} only{% if title_only_sources %} ({{ title_only_sources }}){% endif %}. A title is too little to rank on, so {{ "it was" if n_title_only == 1 else "they were" }} not eligible for this issue.</p>
+    {% endif %}
     {% if excluded %}
-    <p style="margin:0 0 10px 0;">Not assessed this cycle:
+    <p style="margin:0 0 10px 0;">Left out as not research papers:
       {% for x in excluded %}{{ x.n }} from {{ x.source }} ({{ x.reason }}){{ "; " if not loop.last else "." }}{% endfor %}
     </p>
     {% endif %}

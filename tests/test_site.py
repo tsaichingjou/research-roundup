@@ -40,7 +40,7 @@ def test_site_files_and_newsletter_content(built):
     assert (out / "index.html").exists() and (out / ".nojekyll").exists()
     for e in report["entries"]:
         assert e["analysis"]["summary"] in newsletter
-    assert "Not assessed this cycle: 1 from NBER full name (no abstract available)" in newsletter
+    assert "1 publication with no abstract anywhere was labelled by market focus from its title only" in newsletter
     assert "&lt;/script&gt;" in newsletter                       # titles are escaped
     assert 'href="https://example.org/rr/"' in newsletter        # absolute link for email
 
@@ -54,7 +54,7 @@ def test_dashboard_embeds_valid_json_safely(built):
     assert len(data["issues"]) == 1 and len(data["papers"]) == 4
     featured = [p for p in data["papers"] if p["issues"]]
     assert all(p["analysis"] for p in featured)
-    assert {p["status"] for p in data["papers"]} == {"scored", "excluded"}
+    assert {p["status"] for p in data["papers"]} == {"scored", "title_only"}
 
 
 def test_republishing_same_month_replaces_issue(built):

@@ -198,13 +198,13 @@ class Storage:
         return [_paper_dict(r) for r in rows]
 
     def set_abstract(self, uid: str, abstract: str, source: str) -> None:
-        """Store a recovered abstract and clear a 'no abstract' exclusion so the
+        """Store a recovered abstract and clear a 'no abstract' exclusion or title-only label so the
         paper is screened on the next run."""
         with self._conn() as conn:
             conn.execute("UPDATE papers SET abstract = ?, abstract_source = ?, enrich_tried_at = ? WHERE uid = ?",
                          (abstract, source, datetime.now(timezone.utc).isoformat(), uid))
-            conn.execute("DELETE FROM screening WHERE uid = ? AND status = 'excluded' "
-                         "AND reason = 'no abstract available'", (uid,))
+            conn.execute("DELETE FROM screening WHERE uid = ? AND (status = 'title_only' OR "
+                         "(status = 'excluded' AND reason = 'no abstract available'))", (uid,))
 
     def mark_enrich_tried(self, uid: str) -> None:
         with self._conn() as conn:

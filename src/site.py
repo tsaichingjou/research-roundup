@@ -103,8 +103,13 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
                 excluded.append({"source": data["sources"].get(src, {}).get("name", src),
                                  "reason": k.removeprefix("excluded: "), "n": v})
     recovered = sum(c.get("abstract recovered", 0) for c in cov.values())
+    title_only = sorted(((c.get("classified from title", 0), data["sources"].get(src, {}).get("name", src))
+                         for src, c in cov.items() if c.get("classified from title")), reverse=True)
     return {
         "site": site, "issue": issue, "entries": entries, "focus": FOCUS, "recovered": recovered,
+        "n_title_only": sum(n for n, _ in title_only),
+        "title_only_sources": ", ".join(f"{n} from {name}" for n, name in title_only[:4])
+                              + (", and others" if len(title_only) > 4 else ""),
         "n_full": sum(e["analysis"].get("basis") == "full text" for e in entries),
         "sources": data["sources"],
         "composition": [(k, composition[k]) for k in FOCUS if composition[k]],

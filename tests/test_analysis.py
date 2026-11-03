@@ -41,6 +41,10 @@ class FakeClient:
                 out.append({"id": pid, "score": score, "market_focus": market.lower(),
                             "topic": "Monetary policy", "reason": "test"})
             return out
+        if prompt.startswith("These publications have no abstract"):
+            return [{"id": pid, "market_focus": (re.search(r"\[(EM|DM|Transversal)\]", t) or [0, "DM"])[1],
+                     "topic": "Labour", "reason": "From the title."}
+                    for pid, t in re.findall(r"id: (p\d+)\nsource: .*\ntitle: (.*)", prompt)]
         title = re.search(r"Title: (.*)", prompt).group(1)
         market = re.search(r"\[(EM|DM|Transversal)\]", title).group(1)
         return {"summary": "A summary.", "key_takeaways": ["a", "b", "c", "d"],
@@ -133,7 +137,7 @@ def test_run_analysis_end_to_end_and_caching(tmp_path):
     assert titles[0] == "Rate shocks [DM] score=9"
     assert "EM capital flows [EM] score=8" in titles
     assert len(titles) == 4 and sum("nber" == e["paper"]["source_id"] for e in report["entries"]) == 2
-    assert report["coverage"]["qje"] == {"candidates": 1, "excluded: no abstract available": 1}
+    assert report["coverage"]["qje"] == {"candidates": 1, "classified from title": 1}
     assert report["entries"][0]["analysis"]["key_takeaways"] == ["a", "b", "c"]
 
     # Second run: nothing re-screened or re-analysed -> no new LLM calls.
@@ -256,7 +260,7 @@ def test_weekly_screening_then_monthly_reuses_scores(tmp_path):
                        + [("s9", "No abstract [DM] score=8", "")])
     client = FakeClient()
     r = analysis.run_screening(store, client, CFG)
-    assert r == {"new": 4, "excluded": 1, "scored": 3, "unscored": 0}
+    assert r == {"new": 4, "excluded": 1, "scored": 3, "unscored": 0, "title_only": 1}
     n = len(client.prompts)
     report = analysis.run_analysis(store, client, CFG)
     assert len(report["entries"]) == 3

@@ -72,6 +72,28 @@ def screening_prompt(papers: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def title_prompt(papers: list[dict]) -> str:
+    """Market-focus label for publications with no abstract: title and source only.
+    No relevance score is asked for, since a title is too little to rank on."""
+    lines = [
+        "These publications have no abstract available. From the title and the publishing",
+        "institution alone, give each one a market-focus label and a short topic.",
+        "",
+        MARKET_FOCUS_GUIDE,
+        "",
+        "Return a JSON array with one object per publication, with exactly these keys:",
+        '  "id": the id as given,',
+        '  "market_focus": "EM" | "DM" | "Transversal",',
+        '  "topic": short topic label, 1-4 words,',
+        '  "reason": one short sentence on why this label fits the title.',
+        "",
+        "Publications:",
+    ]
+    for p in papers:
+        lines += ["---", f"id: {p['id']}", f"source: {p['source']}", f"title: {p['title']}"]
+    return "\n".join(lines)
+
+
 def analysis_prompt(paper: dict) -> str:
     authors = ", ".join(paper.get("authors") or []) or "not listed"
     full_text = paper.get("full_text")

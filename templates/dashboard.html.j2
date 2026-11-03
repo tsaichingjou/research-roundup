@@ -228,6 +228,11 @@
 <script>
 (() => {
   const DATA = JSON.parse(document.getElementById("site-data").textContent);
+  // Datasets and editorial notices are not research: kept in the JSON, left out of the views.
+  const isNonPaper = p => p.status === "excluded" && p.reason !== "no abstract available";
+  const N_NONPAPER = DATA.papers.filter(isNonPaper).length;
+  DATA.papers = DATA.papers.filter(p => !isNonPaper(p));
+  const TITLE_ONLY_NOTE = "No abstract is available for this publication, so its market focus was labelled from the title alone. It was not scored and is not eligible for the newsletter.";
   const DISCLAIMER = {{ (site.disclaimer or "")|tojson }};
   const FOCUS = DATA.focus;
   const FOCUS_KEYS = ["EM", "DM", "Transversal"];
@@ -317,8 +322,10 @@
       ${s.min_papers} and ${s.max_papers} per issue, with three rules: a paper needs at least ${s.min_score} out of 10;
       no source contributes more than ${s.max_per_source}, so one prolific institution cannot fill the issue; and if no
       emerging-markets paper made the cut but one qualifies, it replaces the lowest-ranked pick.
-      Papers without a usable abstract, even after looking it up in OpenAlex and on the publisher's page, are listed
-      but not assessed.</p></details>`;
+      Papers whose feed has no abstract get one looked up in OpenAlex, on the publisher's page or at the start of the
+      paper's own text. Where none exists anywhere (mostly JPE, which publishes no open abstracts), the market focus is
+      labelled from the title so the paper still counts in the coverage chart, but it is not scored and cannot be selected.
+      Data deposits and editorial notices are left out as not research.</p></details>`;
   }
 
   // ---------- issue band ----------
@@ -340,7 +347,7 @@
     band.innerHTML = `
       <div><h2 id="issue-title">${esc(issue.title)}</h2>
         <p class="window">Research published ${fmtDate(issue.stats.window_start)} to ${fmtDate(issue.stats.window_end)}.
-        ${papers.length} chosen for the newsletter from ${issue.stats.n_candidates} screened.</p></div>
+        ${papers.length} chosen for the newsletter from ${DATA.papers.filter(p => inWindow(p, issue)).length} screened.</p></div>
       <p class="intro">${esc(issue.intro)}</p>
       <div class="strip-block">
         <ul class="strip" aria-label="Papers in this newsletter, coloured by market focus">
@@ -379,12 +386,14 @@
     list.innerHTML = papers.map(p => {
       const sameIssue = state.scope === "featured" && currentIssue();
       const featured = p.issues.length && !sameIssue ? `<span class="star">In the ${esc(p.issues.map(i => (issues.find(x => x.id === i) || {}).title || i).join(", "))} newsletter</span>` : "";
-      const status = p.status === "excluded" ? `<span>Not assessed: ${esc(p.reason)}</span>` : (p.focus ? `<span style="color:${VAR[p.focus]};font-weight:600">${esc(focusLabel(p.focus))}</span>` : "");
+      const status = p.status === "excluded" ? `<span>No abstract, not yet labelled</span>`
+        : (p.focus ? `<span style="color:${VAR[p.focus]};font-weight:600">${esc(focusLabel(p.focus))}</span>` : "")
+          + (p.status === "title_only" ? `<span>Labelled from title</span>` : "");
       return `<li><button type="button" class="row" data-uid="${p.uid}" aria-current="${state.selected === p.uid}">
         <span class="bar" style="background:${p.focus ? VAR[p.focus] : "var(--none)"}"></span>
         <span><span class="t">${esc(p.title)}</span>
           <span class="m">${status}<span>${esc(shortSrc(p.source))}</span><span>${fmtDate(p.published || p.fetched_at)}</span>${featured}</span></span>
-        <span class="s">${p.score != null ? `<b>${p.score}</b>of 10` : ""}</span>
+        <span class="s">${p.score != null ? `<b>${p.score}</b>of 10` : p.status === "title_only" ? `<span title="No abstract: not scored">n/a</span>` : ""}</span>
       </button></li>`;
     }).join("");
     list.querySelectorAll(".row").forEach(r => r.addEventListener("click", () => { select(r.dataset.uid); render(); }));
@@ -409,7 +418,8 @@
         <h4>Key takeaways</h4><ul>${a.key_takeaways.map(t => `<li>${esc(t)}</li>`).join("")}</ul>
         <h4>Why it matters</h4><p>${esc(a.relevance)}</p>
         <p class="focus-note" style="border-left-color:${color}"><strong>Why ${esc(focusLabel(p.focus).toLowerCase())}:</strong> ${esc(a.market_focus_rationale)}</p>`
-      : p.reason ? `<p class="focus-note" style="border-left-color:${color}"><strong>${p.status === "excluded" ? "Not assessed" : "Screening note"}:</strong> ${esc(p.reason)}</p>` : ""}
+      : p.status === "title_only" ? `<p class="focus-note" style="border-left-color:${color}"><strong>Labelled from the title:</strong> ${esc(TITLE_ONLY_NOTE)}${p.reason ? ` ${esc(p.reason)}` : ""}</p>`
+      : p.reason ? `<p class="focus-note" style="border-left-color:${color}"><strong>${p.status === "excluded" ? "Not yet labelled" : "Screening note"}:</strong> ${esc(p.reason)}</p>` : ""}
       <dl class="facts">
         <dt>Source</dt><dd>${esc(srcName(p.source))}</dd>
         <dt>Published</dt><dd>${fmtDate(p.published) || "Not stated"}</dd>
@@ -437,23 +447,29 @@
       const ps = pool.filter(p => p.source === id);
       const r = { id, total: ps.length, na: ps.filter(p => p.status === "excluded").length,
         pending: ps.filter(p => p.status === "pending").length, featured: ps.filter(p => p.issues.length).length,
-        reasons: [...new Set(ps.filter(p => p.status === "excluded").map(p => p.reason))] };
-      FOCUS_KEYS.forEach(k => r[k] = ps.filter(p => p.status === "scored" && p.focus === k).length);
+        titleOnly: ps.filter(p => p.status === "title_only").length };
+      FOCUS_KEYS.forEach(k => {
+        r[k] = ps.filter(p => (p.status === "scored" || p.status === "title_only") && p.focus === k).length;
+        r[k + "_t"] = ps.filter(p => p.status === "title_only" && p.focus === k).length;
+      });
       r.scored = FOCUS_KEYS.reduce((s, k) => s + r[k], 0);
       return r;
     }).sort((a, b) => rank(a.id) - rank(b.id) || b.total - a.total);
     const max = Math.max(1, ...rows.map(r => r.total));
-    $("cov-sub").textContent = issue
-      ? `Every publication screened for the ${issue.title} issue, by source and market focus. Hatched bars are papers that could not be assessed, usually because the publisher provides no abstract.`
-      : "Every publication in the database, by source and market focus. Hatched bars are papers that could not be assessed, usually because the publisher provides no abstract.";
+    const nTitle = rows.reduce((s, r) => s + r.titleOnly, 0);
+    $("cov-sub").textContent = (issue ? `Every publication screened for the ${issue.title} issue, by source and market focus.`
+      : "Every publication in the database, by source and market focus.")
+      + (nTitle ? ` ${nTitle} publications with no abstract anywhere (mostly JPE, which publishes none openly) are labelled from their title and counted here, but are not scored.` : "")
+      + (N_NONPAPER ? ` ${N_NONPAPER} non-research items (data deposits, editorial notices) are left out.` : "");
+    const anyNa = rows.some(r => r.na);
     $("chart-legend").innerHTML = FOCUS_KEYS.map(k => `<span><span class="swatch" style="background:${VAR[k]}"></span>${esc(focusLabel(k))}</span>`).join("")
-      + `<span><span class="swatch" style="background:repeating-linear-gradient(135deg,#dfe4ea 0 3px,#f2f4f7 3px 6px);border:1px solid #d5dbe3"></span>Not assessed</span>`;
+      + (anyNa ? `<span><span class="swatch" style="background:repeating-linear-gradient(135deg,#dfe4ea 0 3px,#f2f4f7 3px 6px);border:1px solid #d5dbe3"></span>Not yet labelled</span>` : "");
     let lastGroup = null;
     $("chart").innerHTML = rows.map(r => {
       const head = groupOf(r.id) !== lastGroup ? `<span class="grp">${esc(lastGroup = groupOf(r.id))}</span>` : "";
       const segs = FOCUS_KEYS.filter(k => r[k]).map(k =>
-        `<span class="seg-bar" data-tip="${esc(shortSrc(r.id))}: ${r[k]} ${esc(focusLabel(k).toLowerCase())}" style="width:${r[k] / max * 100}%;background:${VAR[k]}"></span>`).join("")
-        + (r.na ? `<span class="seg-bar na" data-tip="${esc(shortSrc(r.id))}: ${r.na} not assessed (${esc(r.reasons.join(", "))})" style="width:${r.na / max * 100}%"></span>` : "");
+        `<span class="seg-bar" data-tip="${esc(shortSrc(r.id))}: ${r[k]} ${esc(focusLabel(k).toLowerCase())}${r[k + "_t"] ? ` (${r[k + "_t"] === r[k] ? "all" : r[k + "_t"]} labelled from title)` : ""}" style="width:${r[k] / max * 100}%;background:${VAR[k]}"></span>`).join("")
+        + (r.na ? `<span class="seg-bar na" data-tip="${esc(shortSrc(r.id))}: ${r.na} without an abstract, not yet labelled" style="width:${r.na / max * 100}%"></span>` : "");
       return `${head}<span class="lbl">${esc(shortSrc(r.id))}</span><span class="track">${segs}</span><span class="tot">${r.total}</span>`;
     }).join("");
     $("chart").querySelectorAll("[data-tip]").forEach(s => {
@@ -461,9 +477,9 @@
       s.addEventListener("mouseleave", hideTip);
     });
     $("cov-table").innerHTML = `<caption id="cov-table-caption" class="visually-hidden">Papers per source</caption>
-      <thead><tr><th scope="col">Source</th><th scope="col">Group</th><th scope="col">Screened</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Not assessed</th><th scope="col">In newsletter</th></tr></thead>
+      <thead><tr><th scope="col">Source</th><th scope="col">Group</th><th scope="col">Screened</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Labelled from title</th>${anyNa ? `<th scope="col">Not yet labelled</th>` : ""}<th scope="col">In newsletter</th></tr></thead>
       <tbody>${rows.map(r => `<tr><td>${esc(srcName(r.id))}</td><td>${esc(groupOf(r.id))}</td>
-        <td>${r.total}</td>${FOCUS_KEYS.map(k => `<td>${r[k]}</td>`).join("")}<td>${r.na}${r.reasons.length ? ` <span style="color:var(--muted)">(${esc(r.reasons.join(", "))})</span>` : ""}</td><td>${r.featured}</td></tr>`).join("")}</tbody>`;
+        <td>${r.total}</td>${FOCUS_KEYS.map(k => `<td>${r[k]}</td>`).join("")}<td>${r.titleOnly}</td>${anyNa ? `<td>${r.na}</td>` : ""}<td>${r.featured}</td></tr>`).join("")}</tbody>`;
   }
 
   // ---------- tooltip ----------
