@@ -124,7 +124,7 @@
   <tr><td style="padding:36px 0 0 0;"></td></tr>
   <tr><td class="px" bgcolor="{{ mist }}" style="padding:26px 40px 30px 40px; background:{{ mist }}; font-family:{{ sans }}; font-size:13px; line-height:1.6; color:{{ muted }};">
     <p style="margin:0 0 8px 0; font-size:14px; font-weight:bold; color:{{ ink }};">How this issue was made</p>
-    <p style="margin:0 0 10px 0;">An automated agent screened {{ issue.stats.n_candidates }} new publications from {{ n_sources }} sources ({{ window }}). {{ issue.stats.n_scored }} with a usable abstract were scored for market relevance by a language model, and the {{ entries|length }} above were selected, with at most two papers per source.</p>
+    <p style="margin:0 0 10px 0;">An automated agent screened {{ issue.stats.n_candidates }} publications from {{ n_sources }} sources: everything published {{ window }}{% if n_late %}, plus {{ n_late }} from the previous month that appeared only after its issue went out{% endif %}. {{ issue.stats.n_scored }} with a usable abstract were scored for market relevance by a language model, and the {{ entries|length }} above were selected, with at most two papers per source.</p>
     {% if recovered %}
     <p style="margin:0 0 10px 0;">For {{ recovered }} papers whose feed carried no abstract, a stand-in was recovered before screening: from OpenAlex, the publisher's page, or the opening of the paper's own text.</p>
     {% endif %}

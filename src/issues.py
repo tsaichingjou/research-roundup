@@ -1,9 +1,9 @@
 """Freeze the current selection into a numbered monthly issue.
 
-An issue is named after the month at the midpoint of its window, so a run on
-1 November (window 1 Oct - 1 Nov) and one on 31 October (30 Sep - 31 Oct) both
-produce the "October 2026" issue. Re-publishing the same month replaces that
-issue; earlier months are never touched.
+An issue covers one calendar month and is named after it: the run on 1 November
+produces the "October 2026" issue (research published 1-31 October, plus late
+arrivals from September). Re-publishing the same month replaces that issue;
+earlier months are never touched.
 """
 
 from __future__ import annotations
@@ -57,7 +57,11 @@ def publish_issue(storage: Storage, report: dict, client: JSONModel | None = Non
     entries = report["entries"]
     if not entries:
         raise ValueError("No papers were selected, so there is nothing to publish.")
-    issue_id, title = issue_id_and_title(report["window_start"], report["window_end"])
+    if report.get("month"):
+        issue_id = report["month"]
+        title = datetime.fromisoformat(f"{issue_id}-01").strftime("%B %Y")
+    else:
+        issue_id, title = issue_id_and_title(report["window_start"], report["window_end"])
     issue = {
         "id": issue_id,
         "title": title,
@@ -66,6 +70,8 @@ def publish_issue(storage: Storage, report: dict, client: JSONModel | None = Non
         "stats": {
             "window_start": report["window_start"],
             "window_end": report["window_end"],
+            "pool_uids": report.get("pool_uids", []),
+            "late_uids": report.get("late_uids", []),
             "n_candidates": report["n_candidates"],
             "n_scored": report["n_scored"],
             "coverage": report["coverage"],

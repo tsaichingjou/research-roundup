@@ -4,7 +4,7 @@ from src import analysis, enrich
 from src.fetchers.http import FetchError
 from src.models import Paper
 from src.storage import Storage
-from tests.test_analysis import ABSTRACT, CFG, FakeClient
+from tests.test_analysis import ABSTRACT, CFG, LAST_MONTH, FakeClient
 
 LONG = "We study how sovereign spreads in emerging markets react to U.S. monetary policy shocks. " * 4
 
@@ -59,7 +59,7 @@ def test_enricher_uses_openalex_then_landing_page(monkeypatch):
 def test_recovered_paper_is_screened_next_run(tmp_path, monkeypatch):
     store = Storage(tmp_path / "t.db")
     store.save_papers([Paper(source_id="jpe", source_name="JPE", title="Spreads [EM] score=8",
-                             url="https://doi.org/10.1086/9", abstract="")])
+                             url="https://doi.org/10.1086/9", abstract="", published=LAST_MONTH)])
     analysis.run_analysis(store, FakeClient(), CFG)
     assert next(iter(store.get_screening().values()))["status"] == "title_only"
 

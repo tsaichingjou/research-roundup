@@ -36,7 +36,7 @@ sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screenin
 | `src/issues.py` | Freezes the selection into a monthly issue with an editor's note; past issues never change. |
 | `src/site.py`, `templates/` | Builds the static site: one email-ready newsletter per issue and the interactive explorer. |
 | `config/site.yaml` | Site title, public URL (used for links inside the emailed newsletter), audience line. |
-| `.github/workflows/` | Weekly screening and monthly publishing on GitHub Actions, deployment to GitHub Pages, tests on every push. |
+| `.github/workflows/` | Daily screening and monthly publishing on GitHub Actions, deployment to GitHub Pages, tests on every push. |
 | `main.py` | Command-line entry point. |
 | `tests/` | Unit tests using saved feed fixtures (no network needed). |
 
@@ -63,9 +63,9 @@ suite without network access or API keys.
 
 | When | Job | Steps |
 |---|---|---|
-| Mondays 05:23 UTC | Weekly screening | `fetch` (with abstract recovery) → `screen` → `build` |
-| 1st of the month, 06:17 UTC | Monthly issue | `fetch` → `publish` (select, write up, freeze the issue, build) |
-| On demand | Weekly, monthly or republish | "Run workflow" button in the Actions tab; *republish* retries every missing abstract and rewrites the current month's issue (`enrich --retry-all` → `publish --rewrite`), e.g. after a prompt change |
+| Every day, 05:23 UTC | Daily screening | `fetch` (with abstract recovery) → `screen` → `build` (refreshes the month in progress and its provisional picks) |
+| 1st of the month, 06:17 UTC | Monthly issue | `fetch` → `publish` (select from the month that just ended, write up, freeze the issue, build) |
+| On demand | Daily, monthly or republish | "Run workflow" button in the Actions tab; *republish* retries every missing abstract and rewrites last month's issue (`enrich --retry-all` → `publish --rewrite`), e.g. after a prompt change |
 
 Each run commits its database (`data/published.db`) and the built site
 (`docs/`) back to the repository, so the next run continues where the last one
@@ -79,10 +79,19 @@ Setting up a fork: add the repository secrets `GEMINI_API_KEY` (required) and
 `OPENALEX_API_KEY` (optional), set *Settings → Pages → Source* to
 *GitHub Actions*, then start the workflow once from the Actions tab.
 
-**Weekly vs monthly.** The brief asks the agent to screen publications each
-week and publish a monthly newsletter. The weekly runs do the screening, and the
-explorer's "New this week" view shows what each one found; the newsletter itself
-is monthly. The newsletter HTML is email-ready, so sending it would only need an
+**Periods.** Each issue covers one calendar month: the October issue holds
+research published 1-31 October and is produced on 1 November; re-running it
+later (`publish --rewrite`, or `--month 2026-10`) keeps the same window. A paper
+dated in October that only reaches a source after the October issue went out
+joins the November issue as a *late arrival* (counted in the newsletter's notes),
+so nothing is lost to indexing delays. During the month the explorer shows the
+month in progress with a provisional selection: the papers that would be chosen
+if the issue were made that day.
+
+**Daily vs monthly.** The brief asks the agent to monitor weekly publications
+and publish a monthly newsletter. Screening runs daily (a few cheap batch calls)
+so the dashboard is never more than a day behind, and its "Published this week"
+view shows the latest week; the newsletter itself is monthly. The newsletter HTML is email-ready, so sending it would only need an
 SMTP step in the monthly job; that was left out because the brief asks for an
 email-ready or web-viewable newsletter, not for a distribution list.
 
@@ -110,10 +119,11 @@ python main.py enrich                # recover missing abstracts (also runs auto
 python main.py show --limit 10       # list the latest stored papers
 python main.py models                # list Gemini models your key can use
 python main.py check                 # test each configured model and its response time
-python main.py screen                # weekly job: score new papers, no write-ups
+python main.py screen                # daily job: score new papers, no write-ups
 python main.py analyse               # screen, select and analyse this month's papers
 python main.py analyse --rewrite     # regenerate write-ups (after a prompt change, or with a stronger model)
-python main.py publish               # analyse, freeze this month's issue, build the site in site/
+python main.py publish               # analyse, freeze last month's issue, build the site in site/
+python main.py publish --month 2026-10   # build (or rebuild) a specific month's issue
 python main.py build                 # rebuild site/ from the database (no LLM calls)
 python main.py export-labels         # blind, stratified labelling sample -> evaluation/labels.csv
 python main.py evaluate              # compare LLM classification with the human labels
@@ -208,9 +218,8 @@ capped at the same 1,500 characters used for screening, so this costs no more
 Gemini tokens than an abstract. Only openly published pages are read: a page
 that answers with an error, a login or a bot check is skipped, so no paywall is
 bypassed. The origin of each recovered text is stored and shown in the
-explorer. Papers still without one (in practice mostly JPE) are listed but not
-assessed, as agreed for paywalled sources, and counted per source in every
-issue. Replication datasets that central banks deposit in OpenAlex (Zenodo,
+explorer. Papers still without one (in practice mostly JPE) are labelled by
+market focus from their title only, not scored, and counted in every issue. Replication datasets that central banks deposit in OpenAlex (Zenodo,
 Dataverse, Mendeley Data) are filtered out as not being papers.
 
 ## Reliability design
@@ -287,12 +296,19 @@ run builds `docs/` and deploys it to GitHub Pages):
   three takeaways, why it matters and the classification rationale. A closing
   "How this issue was made" section states what was screened, which sources
   could not be assessed and why, and which model wrote the summaries.
-- **`index.html` — the explorer.** Pick any issue, switch between its featured
-  papers and everything screened that month, filter by market focus, source or
-  free text, and open a paper to see its summary, takeaways, rationale,
-  relevance score, topics, regions, the model that wrote it and the abstract.
-  A source-coverage chart and table show, per source, how many papers were
-  screened, how they were classified and how many could not be assessed.
+- **`index.html` — the explorer**, in three views that all follow one period
+  selector (a published issue, the month in progress, or all papers):
+  - *Papers*: the issue's chosen papers (or, for the month in progress, the
+    provisional picks), every paper of the period, or those published this
+    week; filter by market focus, source or free text, and open a paper to see
+    its summary, takeaways, rationale, relevance score, topics, regions, the
+    model that wrote it and the abstract.
+  - *Source coverage*: a chart and table of how many publications each source
+    contributed in the period, by market focus.
+  - *How it works*: the relevance scale, the market-focus definitions, the
+    selection rules, the monthly timeline, how missing abstracts are handled and
+    a glossary of the dashboard's terms, for readers who receive the link
+    without any context.
   The data is embedded in the page, so it also works opened as a local file;
   the same data is published as `data/site.json`.
 - **Design.** The three market-focus colours (EM ochre, DM blue, Transversal
@@ -303,7 +319,7 @@ run builds `docs/` and deploys it to GitHub Pages):
 **"In the newsletter"** marks the 5–8 papers chosen for an issue: the highest
 relevance scores, at least 6/10, no more than two per source, with an
 emerging-markets paper swapped in when one qualifies but missed the cut. The
-explorer states these rules next to each issue, reading them from
+"How it works" view states these rules, reading the thresholds from
 `config/analysis.yaml` so the explanation always matches the code.
 
 **Audience.** The site is prepared for Crédit Agricole CIB Global Market

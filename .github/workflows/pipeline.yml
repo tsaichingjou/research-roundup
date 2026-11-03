@@ -1,7 +1,9 @@
 # The Research Roundup — scheduled pipeline
 #
-#   Weekly  (Mondays 05:23 UTC):   fetch new papers, recover abstracts, score them
-#   Monthly (1st, 06:17 UTC):      fetch, select 5-8 papers, write them up, publish the issue
+#   Daily   (05:23 UTC):           fetch new papers, recover abstracts, score them, refresh
+#                                  the dashboard (incl. the provisional picks of the month in progress)
+#   Monthly (1st, 06:17 UTC):      fetch, select 5-8 papers from the month that just ended,
+#                                  write them up, publish the issue
 #
 # Each run commits its database (data/published.db) and the built site (docs/)
 # back to the repository, then deploys docs/ to GitHub Pages.
@@ -11,14 +13,14 @@ name: Research Roundup pipeline
 
 on:
   schedule:
-    - cron: "23 5 * * 1"     # weekly screening
+    - cron: "23 5 * * *"     # daily screening
     - cron: "17 6 1 * *"     # monthly issue
   workflow_dispatch:
     inputs:
       mode:
-        description: "weekly = fetch and score; monthly = fetch, write up and publish the issue; republish = retry missing abstracts and rewrite this month's issue"
+        description: "daily = fetch and score; monthly = fetch, write up and publish last month's issue; republish = retry missing abstracts and rewrite last month's issue"
         type: choice
-        options: [weekly, monthly, republish]
+        options: [daily, monthly, republish]
         default: monthly
 
 concurrency:
@@ -56,7 +58,7 @@ jobs:
           fi
           [ -n "$OPENALEX_API_KEY" ] || echo "::notice::OPENALEX_API_KEY not set: OpenAlex runs on its smaller anonymous budget."
 
-      - name: Decide weekly or monthly
+      - name: Decide daily or monthly
         id: mode
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -64,16 +66,16 @@ jobs:
           elif [ "${{ github.event.schedule }}" = "17 6 1 * *" ]; then
             echo "mode=monthly" >> "$GITHUB_OUTPUT"
           else
-            echo "mode=weekly" >> "$GITHUB_OUTPUT"
+            echo "mode=daily" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Fetch new papers and recover missing abstracts
         id: fetch
         run: python main.py fetch
 
-      - name: Weekly — score new papers
-        id: weekly
-        if: steps.mode.outputs.mode == 'weekly'
+      - name: Daily — score new papers
+        id: daily
+        if: steps.mode.outputs.mode == 'daily'
         run: |
           python main.py screen
           python main.py build
@@ -83,7 +85,7 @@ jobs:
         if: steps.mode.outputs.mode == 'monthly'
         run: python main.py publish
 
-      - name: Republish — retry missing abstracts, rewrite this month's issue
+      - name: Republish — retry missing abstracts, rewrite last month's issue
         id: republish
         if: steps.mode.outputs.mode == 'republish'
         run: |

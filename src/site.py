@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -50,6 +50,14 @@ def _date(iso: str | None) -> str:
     if not iso:
         return ""
     return datetime.fromisoformat(iso).strftime("%-d %b %Y")
+
+
+def _last_day(end_iso: str) -> str:
+    """Windows end at midnight on the 1st of the next month: show the last day included."""
+    end = datetime.fromisoformat(end_iso)
+    if end.hour == end.minute == 0 and end.day == 1:
+        end = end - timedelta(days=1)
+    return end.strftime("%-d %b %Y")
 
 
 def collect(storage: Storage, sources_cfg: dict) -> dict:
@@ -115,13 +123,39 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
         "composition": [(k, composition[k]) for k in FOCUS if composition[k]],
         "n_sources": len(cov),
         "excluded": excluded,
-        "window": f"{_date(issue['stats']['window_start'])} to {_date(issue['stats']['window_end'])}",
+        "window": f"{_date(issue['stats']['window_start'])} to {_last_day(issue['stats']['window_end'])}",
+        "n_late": len(issue["stats"].get("late_uids") or []),
         "fmt_date": _date,
     }
 
 
+def add_periods(data: dict, in_progress: dict | None) -> None:
+    """Give the dashboard its periods (the month in progress, then each issue) and
+    tag every paper with the one period it belongs to."""
+    periods = []
+    if in_progress and not any(i["id"] == in_progress["id"] for i in data["issues"]):
+        periods.append({**{k: in_progress[k] for k in ("id", "title", "window_start", "window_end",
+                                                       "paper_uids", "late_uids")},
+                        "status": "in_progress", "pool": set(in_progress["pool_uids"])})
+    for i in data["issues"]:
+        st = i["stats"]
+        pool = set(st.get("pool_uids") or [])
+        if not pool:   # issues made before calendar-month windows: fall back to dates
+            pool = {p["uid"] for p in data["papers"]
+                    if st["window_start"][:10] <= (p["published"] or p["fetched_at"])[:10] < st["window_end"][:10]}
+        periods.append({"id": i["id"], "title": i["title"], "window_start": st["window_start"],
+                        "window_end": st["window_end"], "paper_uids": i["paper_uids"],
+                        "late_uids": st.get("late_uids", []), "status": "published", "pool": pool})
+    for p in data["papers"]:
+        p["period"] = next((x["id"] for x in periods if p["uid"] in x["pool"]), None)
+    for x in periods:
+        x["n_pool"] = len(x.pop("pool"))
+    data["periods"] = periods
+
+
 def build_site(storage: Storage, sources_cfg: dict, site_cfg: dict,
-               out_dir: Path | None = None, selection: dict | None = None) -> dict:
+               out_dir: Path | None = None, selection: dict | None = None,
+               in_progress: dict | None = None) -> dict:
     out = Path(out_dir or ROOT / site_cfg.get("output_dir", "docs"))
     (out / "issues").mkdir(parents=True, exist_ok=True)
     (out / "data").mkdir(parents=True, exist_ok=True)
@@ -129,6 +163,7 @@ def build_site(storage: Storage, sources_cfg: dict, site_cfg: dict,
                       autoescape=select_autoescape(["html", "j2"]), trim_blocks=True, lstrip_blocks=True)
     data = collect(storage, sources_cfg)
     data["selection"] = selection
+    add_periods(data, in_progress)
 
     for issue in data["issues"]:
         html = env.get_template("newsletter.html.j2").render(**issue_context(data, issue, site_cfg))

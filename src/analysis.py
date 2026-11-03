@@ -235,6 +235,80 @@ def analyse_paper(paper: dict, client: JSONModel, full_text=None) -> dict:
     raise LLMError(f"Could not get a valid analysis: {last_error}")
 
 
+# --- Periods ------------------------------------------------------------------------
+# An issue covers one calendar month: the October issue holds research published
+# 1-31 October and is produced on 1 November. The month in progress is screened
+# every day and shown on the dashboard with a provisional selection.
+#
+# Late arrivals: a paper dated in the previous month that only reached a source
+# (or OpenAlex) after that month's issue went out is not lost; it joins the next
+# issue. Before the first issue there is nothing to be late for.
+
+def month_of(now: datetime) -> str:
+    return now.strftime("%Y-%m")
+
+
+def previous_month(month: str) -> str:
+    y, m = map(int, month.split("-"))
+    return f"{y - 1}-12" if m == 1 else f"{y}-{m - 1:02d}"
+
+
+def next_month(month: str) -> str:
+    y, m = map(int, month.split("-"))
+    return f"{y + 1}-01" if m == 12 else f"{y}-{m + 1:02d}"
+
+
+def month_bounds(month: str) -> tuple[str, str]:
+    """First day of the month and first day of the next, as ISO datetimes (UTC)."""
+    return f"{month}-01T00:00:00+00:00", f"{next_month(month)}-01T00:00:00+00:00"
+
+
+def paper_date(p: dict) -> str:
+    """The date that places a paper in a month: publication date, else when first seen."""
+    return (p.get("published") or p.get("fetched_at") or "")[:10]
+
+
+def month_pool(storage: Storage, month: str) -> tuple[list[dict], list[str]]:
+    """Papers that belong to `month`'s issue: those dated in the month, plus late
+    arrivals from the month before. Returns (papers, uids of the late arrivals)."""
+    issues = storage.get_issues()
+    in_other = {u for i in issues if i["id"] != month for u in i["paper_uids"]}
+    prev = previous_month(month)
+    prev_issue = next((i for i in issues if i["id"] == prev), None)
+    this_issue = next((i for i in issues if i["id"] == month), None)
+    pool, late = [], []
+    for p in storage.all_papers():
+        d = paper_date(p)
+        if d[:7] == month:
+            # arrived after this month's issue went out: it is a late arrival for the next one
+            if this_issue and p["uid"] not in this_issue["paper_uids"] \
+                    and p["fetched_at"] > this_issue["published_at"]:
+                continue
+            if p["uid"] not in in_other:
+                pool.append(p)
+        elif (prev_issue and d[:7] == prev and p["uid"] not in in_other
+              and p["fetched_at"] > prev_issue["published_at"]):
+            pool.append(p)
+            late.append(p["uid"])
+    pool.sort(key=paper_date, reverse=True)
+    return pool, late
+
+
+def provisional(storage: Storage, cfg: dict, now: datetime | None = None) -> dict:
+    """The selection the month in progress would get if its issue were made today."""
+    now = now or datetime.now(timezone.utc)
+    month = month_of(now)
+    pool, late = month_pool(storage, month)
+    screened = storage.get_screening()
+    scored = [{**p, **screened[p["uid"]]} for p in pool if screened.get(p["uid"], {}).get("status") == "scored"]
+    picks = select(scored, cfg) if scored else []
+    start, _ = month_bounds(month)
+    return {"id": month, "title": datetime.fromisoformat(start).strftime("%B %Y"),
+            "window_start": start, "window_end": now.isoformat(),
+            "paper_uids": [p["uid"] for p in picks], "pool_uids": [p["uid"] for p in pool],
+            "late_uids": late, "n_scored": len(scored)}
+
+
 # --- Orchestration ----------------------------------------------------------------
 def run_screening(storage: Storage, client: JSONModel, cfg: dict, now: datetime | None = None) -> dict:
     """Pre-filter and score every paper in the window not screened yet.
@@ -242,7 +316,9 @@ def run_screening(storage: Storage, client: JSONModel, cfg: dict, now: datetime 
     This is the weekly job: scores accumulate through the month, so the monthly
     run only has to select and write up. Returns counts for the run."""
     now = now or datetime.now(timezone.utc)
-    since = (now - timedelta(days=cfg["window"]["days"])).isoformat()
+    # This month and the last: the issue being built and the one about to close
+    # (late arrivals for it are screened too).
+    since = month_bounds(previous_month(month_of(now)))[0]
     screened = storage.get_screening()
     candidates = storage.candidates(since)
     # Papers excluded earlier for lack of an abstract are re-checked against the
@@ -269,23 +345,26 @@ def run_screening(storage: Storage, client: JSONModel, cfg: dict, now: datetime 
 
 def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
                  now: datetime | None = None, analysis_client: JSONModel | None = None,
-                 rewrite: bool = False, fulltext_finder=None) -> dict:
+                 rewrite: bool = False, fulltext_finder=None, month: str | None = None) -> dict:
     """`client` screens; `analysis_client` (defaults to `client`) writes the full
     analyses — a fast, cheap model is enough to score, a stronger one writes.
     `rewrite=True` regenerates the write-ups of the selected papers (e.g. after a
     prompt change, or when a stronger model is available again).
     `fulltext_finder` (a fulltext.FullTextFinder) lets the write-ups use the open
-    full text of each selected paper; without it they use the abstract."""
+    full text of each selected paper; without it they use the abstract.
+    `month` ("YYYY-MM") is the issue to build; by default the month that just
+    ended, so a run on 1 November (or a re-run on 3 November) builds October."""
     now = now or datetime.now(timezone.utc)
     analysis_client = analysis_client or client
-    since = (now - timedelta(days=cfg["window"]["days"])).isoformat()
+    month = month or previous_month(month_of(now))
+    start, end = month_bounds(month)
 
-    # 1-2. pre-filter and screen papers not seen before (also run weekly on its own)
+    # 1-2. pre-filter and screen papers not seen before (also run daily on its own)
     run_screening(storage, client, cfg, now)
-    candidates = storage.candidates(since)
+    candidates, late = month_pool(storage, month)
     screened = storage.get_screening()
 
-    # 3. select from everything scored in the window
+    # 3. select from everything scored in the month
     scored = [{**p, **screened[p["uid"]]} for p in candidates
               if screened.get(p["uid"], {}).get("status") == "scored"]
     selected = select(scored, cfg)
@@ -336,8 +415,11 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
         elif st.get("reason"):
             c["excluded: " + st["reason"]] += 1
     return {
-        "window_start": since,
-        "window_end": now.isoformat(),
+        "month": month,
+        "window_start": start,
+        "window_end": end,
+        "late_uids": late,
+        "pool_uids": [p["uid"] for p in candidates],
         "n_candidates": len(candidates),
         "n_scored": len(scored),
         "coverage": {k: dict(v) for k, v in sorted(by_source.items())},

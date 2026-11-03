@@ -32,7 +32,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from src.analysis import load_analysis_config, run_analysis, run_screening  # noqa: E402
+from src.analysis import load_analysis_config, provisional, run_analysis, run_screening  # noqa: E402
 from src.enrich import run_enrichment  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
 from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
@@ -138,10 +138,11 @@ def main() -> int:
 
     sub.add_parser("models", help="List Gemini models available to your API key")
     sub.add_parser("check", help="Test each configured Gemini model")
-    sub.add_parser("screen", help="Weekly job: pre-filter and score new papers (no write-ups)")
+    sub.add_parser("screen", help="Daily job: pre-filter and score new papers (no write-ups)")
     p_an = sub.add_parser("analyse", aliases=["analyze"], help="Screen, select and analyse papers")
     p_an.add_argument("--rewrite", action="store_true",
                       help="Regenerate the write-ups of the selected papers")
+    p_an.add_argument("--month", help="Issue month YYYY-MM (default: the month that just ended)")
 
     p_ex = sub.add_parser("export-labels", help="Write a blind, stratified labelling sample")
     p_ex.add_argument("--per-class", type=int, default=15)
@@ -153,6 +154,7 @@ def main() -> int:
     p_pub = sub.add_parser("publish", help="Analyse, freeze this month's issue and build the site")
     p_pub.add_argument("--rewrite", action="store_true",
                        help="Regenerate the write-ups of this month's selected papers")
+    p_pub.add_argument("--month", help="Issue month YYYY-MM (default: the month that just ended)")
     sub.add_parser("build", help="Rebuild the static site from the database")
 
     args = parser.parse_args()
@@ -210,9 +212,10 @@ def main() -> int:
     site_cfg = yaml.safe_load((ROOT / "config" / "site.yaml").read_text(encoding="utf-8"))
 
     def build() -> int:
-        selection = load_analysis_config(ROOT / "config" / "analysis.yaml")["selection"]
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
         out_dir = ROOT / os.environ.get("RR_SITE_DIR", site_cfg.get("output_dir", "site"))
-        res = build_site(storage, config, site_cfg, out_dir=out_dir, selection=selection)
+        res = build_site(storage, config, site_cfg, out_dir=out_dir, selection=acfg["selection"],
+                         in_progress=provisional(storage, acfg))
         out = res["out_dir"].relative_to(ROOT)
         print(f"Site built in {out}/: {len(res['issues'])} issue(s), {res['papers']} papers.")
         print(f"Open {out}/index.html in a browser to preview it.")
@@ -227,7 +230,7 @@ def main() -> int:
         try:
             client, writer = make_client(acfg, "screening"), make_client(acfg, "analysis")
             report = run_analysis(storage, client, acfg, analysis_client=writer,
-                                  rewrite=args.rewrite,
+                                  rewrite=args.rewrite, month=args.month,
                                   fulltext_finder=make_finder(acfg, config["settings"]))
             issue = publish_issue(storage, report, client=writer)
         except (LLMError, ValueError) as exc:
@@ -297,6 +300,7 @@ def main() -> int:
             writer = make_client(acfg, "analysis")
             report = run_analysis(storage, client, acfg, analysis_client=writer,
                                   rewrite=getattr(args, "rewrite", False),
+                                  month=getattr(args, "month", None),
                                   fulltext_finder=make_finder(acfg, config["settings"]))
         except LLMError as exc:
             print(f"\nERROR: {exc}")

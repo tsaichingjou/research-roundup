@@ -53,10 +53,15 @@ class FakeClient:
                 "topics": ["Monetary policy"], "confidence": "HIGH"}
 
 
+# Papers in the tests are dated in the month that just ended: the issue a run
+# builds by default.
+LAST_MONTH = datetime.fromisoformat(analysis.previous_month(analysis.month_of(datetime.now(timezone.utc))) + "-10T12:00:00+00:00")
+
+
 def make_store(tmp_path, specs):
     store = Storage(tmp_path / "t.db")
     papers = [Paper(source_id=src, source_name=src.upper(), title=title,
-                    url=f"https://example.org/{i}", abstract=abstract)
+                    url=f"https://example.org/{i}", abstract=abstract, published=LAST_MONTH)
               for i, (src, title, abstract) in enumerate(specs)]
     store.save_papers(papers)
     return store

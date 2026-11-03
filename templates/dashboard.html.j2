@@ -69,9 +69,6 @@
   .strip-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 10px; color: var(--muted); font-size: 14px; }
   .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
   .empty-issue { grid-column: 1 / -1; color: var(--muted); }
-  details.rules { margin-top: 14px; font-size: 14px; color: var(--muted); max-width: 90ch; }
-  details.rules summary { cursor: pointer; color: var(--link); width: fit-content; }
-  details.rules p { margin: 8px 0 0; line-height: 1.6; }
 
   /* ---- controls ---- */
   .controls { padding-top: 22px; padding-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
@@ -162,6 +159,44 @@
     .controls select { flex: 1 1 100%; }
   }
   @media (prefers-reduced-motion: reduce) { .strip button { transition: none; } }
+
+  /* ---- view tabs ---- */
+  nav.views { background: var(--brand-dark); }
+  nav.views .wrap { display: flex; gap: 4px; overflow-x: auto; }
+  nav.views a { color: #cfe3dc; text-decoration: none; padding: 11px 14px 10px; border-bottom: 3px solid transparent; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  nav.views a:hover { color: #fff; }
+  nav.views a[aria-current="page"] { color: #fff; border-bottom-color: #fff; }
+  nav.views :focus-visible { outline-color: #fff; outline-offset: -3px; }
+  [hidden] { display: none !important; }
+  .badge { display: inline-block; font: 600 12px/1 var(--sans); letter-spacing: .04em; text-transform: uppercase; padding: 5px 8px; border-radius: 3px; background: #fdf3d7; color: #7a5300; vertical-align: 6px; margin-left: 10px; }
+  .strip.provisional button { opacity: .55; outline: 1px dashed var(--ink); outline-offset: -1px; }
+  .strip.provisional button[aria-pressed="true"], .strip.provisional button:hover { opacity: 1; }
+  .prov { color: #7a5300; font-weight: 600; }
+  .pending-note { margin-top: 18px; padding: 12px 14px; background: #fdf8ea; border-left: 3px solid #c89a2c; font-size: 14px; }
+
+  /* ---- method page ---- */
+  .method { background: var(--paper); }
+  .method .wrap { padding-top: 34px; padding-bottom: 48px; max-width: 900px; }
+  .method h2 { font: 400 32px/1.15 var(--serif); margin: 0 0 8px; letter-spacing: -0.015em; }
+  .method .lede { font-size: 17px; color: var(--muted); margin: 0 0 30px; max-width: 70ch; }
+  .method h3 { font: 600 20px/1.3 var(--serif); margin: 34px 0 10px; padding-top: 22px; border-top: 1px solid var(--rule); }
+  .method p, .method li { max-width: 72ch; }
+  .method ul { padding-left: 20px; }
+  .method li { margin: 6px 0; }
+  .timeline { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .timeline li { background: var(--mist); border-radius: var(--radius); padding: 14px 16px; margin: 0; max-width: none; }
+  .timeline b { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--brand); margin-bottom: 4px; }
+  table.rubric { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 14px; }
+  table.rubric th, table.rubric td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+  table.rubric th { width: 120px; white-space: nowrap; }
+  table.rubric td.n { font-variant-numeric: tabular-nums; font-weight: 600; width: 70px; }
+  dl.glossary { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 10px 20px; margin: 10px 0 0; }
+  dl.glossary dt { font-weight: 600; }
+  dl.glossary dd { margin: 0; }
+  .src-groups { columns: 2 280px; column-gap: 32px; font-size: 14px; }
+  .src-groups div { break-inside: avoid; margin-bottom: 14px; }
+  .src-groups b { display: block; margin-bottom: 2px; }
+  @media (max-width: 700px) { .timeline { grid-template-columns: 1fr; } dl.glossary { grid-template-columns: 1fr; gap: 2px 0; } dl.glossary dd { margin-bottom: 10px; } }
 </style>
 </head>
 <body>
@@ -171,45 +206,54 @@
       <h1 class="brand">{{ site.title }}<small>Paper explorer{% if site.prepared_for %}, prepared for {{ site.prepared_for }}{% endif %}</small></h1>
     </div>
     <div class="top-actions">
-      <label class="visually-hidden" for="issue-select">Issue</label>
+      <label class="visually-hidden" for="issue-select">Period</label>
       <select id="issue-select"></select>
       <a class="btn" id="read-link" href="#">Read the newsletter</a>
     </div>
   </div>
 </header>
-
-<section class="issue" aria-labelledby="issue-title">
-  <div class="wrap" id="issue-band"></div>
-</section>
-
-<div class="wrap">
-  <div class="controls" role="group" aria-label="Filter papers">
-    <div class="seg" id="scope" role="group" aria-label="Which papers">
-      <button type="button" data-scope="featured" aria-pressed="true">In the newsletter</button>
-      <button type="button" data-scope="screened" aria-pressed="false">All screened</button>
-      <button type="button" data-scope="week" aria-pressed="false">New this week</button>
-    </div>
-    <div id="focus-chips" role="group" aria-label="Market focus" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-    <label class="visually-hidden" for="source-select">Source</label>
-    <select id="source-select"></select>
-    <label class="visually-hidden" for="sort-select">Sort</label>
-    <select id="sort-select">
-      <option value="score">Highest relevance</option>
-      <option value="date">Newest first</option>
-      <option value="title">Title A–Z</option>
-    </select>
-    <label class="visually-hidden" for="q">Search titles, authors and abstracts</label>
-    <input class="search" id="q" type="search" placeholder="Search titles, authors, abstracts">
-    <p class="result-count" id="count" aria-live="polite"></p>
+<nav class="views" aria-label="Views">
+  <div class="wrap">
+    <a href="#papers" data-view="papers">Papers</a>
+    <a href="#coverage" data-view="coverage">Source coverage</a>
+    <a href="#method" data-view="method">How it works</a>
   </div>
+</nav>
 
-  <div class="main">
-    <ul class="list" id="list" aria-label="Papers"></ul>
-    <aside class="detail" id="detail" aria-live="polite"><p class="detail-empty">Select a paper to see its summary, classification and metadata.</p></aside>
+<div id="view-papers">
+  <section class="issue" aria-labelledby="issue-title">
+    <div class="wrap" id="issue-band"></div>
+  </section>
+
+  <div class="wrap">
+    <div class="controls" role="group" aria-label="Filter papers">
+      <div class="seg" id="scope" role="group" aria-label="Which papers">
+        <button type="button" data-scope="featured" aria-pressed="true">In the newsletter</button>
+        <button type="button" data-scope="screened" aria-pressed="false">All papers</button>
+        <button type="button" data-scope="week" aria-pressed="false">Published this week</button>
+      </div>
+      <div id="focus-chips" role="group" aria-label="Market focus" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <label class="visually-hidden" for="source-select">Source</label>
+      <select id="source-select"></select>
+      <label class="visually-hidden" for="sort-select">Sort</label>
+      <select id="sort-select">
+        <option value="score">Highest relevance</option>
+        <option value="date">Newest first</option>
+        <option value="title">Title A–Z</option>
+      </select>
+      <label class="visually-hidden" for="q">Search titles, authors and abstracts</label>
+      <input class="search" id="q" type="search" placeholder="Search titles, authors, abstracts">
+      <p class="result-count" id="count" aria-live="polite"></p>
+    </div>
+
+    <div class="main">
+      <ul class="list" id="list" aria-label="Papers"></ul>
+      <aside class="detail" id="detail" aria-live="polite"><p class="detail-empty">Select a paper to see its summary, classification and metadata.</p></aside>
+    </div>
   </div>
 </div>
 
-<section class="coverage" aria-labelledby="cov-title">
+<section class="coverage" id="view-coverage" aria-labelledby="cov-title" hidden>
   <div class="wrap">
     <h2 id="cov-title">Source coverage</h2>
     <p class="sub" id="cov-sub"></p>
@@ -219,6 +263,10 @@
       <table class="cov" id="cov-table"><caption id="cov-table-caption" class="visually-hidden">Papers per source</caption></table>
     </div>
   </div>
+</section>
+
+<section class="method" id="view-method" aria-labelledby="method-title" hidden>
+  <div class="wrap" id="method"></div>
 </section>
 
 <div class="wrap"><footer id="footer"></footer></div>
@@ -239,26 +287,45 @@
   const VAR = { EM: "var(--em)", DM: "var(--dm)", Transversal: "var(--tr)" };
   const TINT = { EM: "var(--em-tint)", DM: "var(--dm-tint)", Transversal: "var(--tr-tint)" };
   const issues = DATA.issues;
+  const periods = DATA.periods || [];
   const byUid = Object.fromEntries(DATA.papers.map(p => [p.uid, p]));
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "";
+  const lastDay = iso => { const d = new Date(iso); if (d.getUTCDate() === 1 && d.getUTCHours() === 0) d.setUTCDate(0); return fmtDate(d.toISOString()); };
+  const nextMonthName = id => { const [y, m] = id.split("-").map(Number); return new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }); };
   const srcName = id => (DATA.sources[id] || {}).name || id;
   const shortSrc = id => (DATA.sources[id] || {}).short || srcName(id);
   const focusLabel = f => f === "Transversal" ? "Transversal" : FOCUS[f].name;
+  const sel = DATA.selection || { min_papers: 5, max_papers: 8, min_score: 6, max_per_source: 2 };
 
+  // Default: the latest published issue (what a reader comes for); else the month in progress.
+  const latestIssue = periods.find(x => x.status === "published");
+  const inProgress = periods.find(x => x.status === "in_progress");
   const state = {
-    issue: issues.length ? issues[0].id : "all",
-    scope: issues.length ? "featured" : "screened",
+    view: "papers",
+    period: (latestIssue || inProgress || { id: "all" }).id,
+    scope: periods.length ? "featured" : "screened",
     focus: new Set(FOCUS_KEYS), source: "all", sort: "score", q: "", selected: null,
   };
 
-  // ---------- issue selector ----------
-  const sel = $("issue-select");
-  sel.innerHTML = issues.map(i => `<option value="${i.id}">${esc(i.title)} issue</option>`).join("")
-    + `<option value="all">All issues</option>`;
-  sel.value = state.issue;
-  sel.addEventListener("change", () => { state.issue = sel.value; state.selected = null; render(); });
+  // ---------- views (hash routing: #papers, #coverage, #method) ----------
+  function setView() {
+    const v = (location.hash || "#papers").slice(1);
+    state.view = ["papers", "coverage", "method"].includes(v) ? v : "papers";
+    ["papers", "coverage", "method"].forEach(k => { $("view-" + k).hidden = k !== state.view; });
+    document.querySelectorAll("nav.views a").forEach(a => a.dataset.view === state.view ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
+    $("issue-select").parentElement.style.visibility = state.view === "method" ? "hidden" : "";
+    render();
+  }
+  window.addEventListener("hashchange", setView);
+
+  // ---------- period selector ----------
+  const periodSel = $("issue-select");
+  periodSel.innerHTML = periods.map(x => `<option value="${x.id}">${esc(x.title)} ${x.status === "in_progress" ? "(in progress)" : "issue"}</option>`).join("")
+    + `<option value="all">All papers</option>`;
+  periodSel.value = state.period;
+  periodSel.addEventListener("change", () => { state.period = periodSel.value; state.selected = null; render(); });
 
   // ---------- source selector ----------
   const srcSel = $("source-select");
@@ -278,24 +345,22 @@
   });
 
   // ---------- data helpers ----------
-  const currentIssue = () => issues.find(i => i.id === state.issue);
-  function inWindow(p, issue) {
-    const d = p.fetched_at, pub = p.published;
-    return (d >= issue.stats.window_start && d <= issue.stats.window_end)
-      || (pub && pub >= issue.stats.window_start && pub <= issue.stats.window_end);
-  }
-  // "New this week": papers first seen in the 7 days before the latest data update.
-  const WEEK_START = new Date(new Date(DATA.generated_at).getTime() - 7 * 864e5).toISOString();
-  const isNewThisWeek = p => p.fetched_at >= WEEK_START;
+  const currentPeriod = () => periods.find(x => x.id === state.period);
+  const isProvisional = () => (currentPeriod() || {}).status === "in_progress";
+  const periodPapers = () => state.period === "all" ? DATA.papers : DATA.papers.filter(p => p.period === state.period);
+  const provisionalUids = new Set(inProgress ? inProgress.paper_uids : []);
+  // "Published this week": publication date (or first seen, if undated) in the 7 days to the latest update.
+  const WEEK_START = new Date(new Date(DATA.generated_at).getTime() - 7 * 864e5).toISOString().slice(0, 10);
+  const isNewThisWeek = p => (p.published || p.fetched_at).slice(0, 10) >= WEEK_START;
 
   function scopePapers() {
-    if (state.scope === "week") return DATA.papers.filter(isNewThisWeek);
-    const issue = currentIssue();
+    const per = currentPeriod();
+    if (state.scope === "week") return periodPapers().filter(isNewThisWeek);
     if (state.scope === "featured") {
-      if (issue) return issue.paper_uids.map(u => byUid[u]).filter(Boolean);
+      if (per) return per.paper_uids.map(u => byUid[u]).filter(Boolean);
       return DATA.papers.filter(p => p.issues.length);
     }
-    return issue ? DATA.papers.filter(p => inWindow(p, issue)) : DATA.papers;
+    return periodPapers();
   }
   function filtered(papers) {
     let out = papers.filter(p =>
@@ -307,57 +372,51 @@
       date: (a, b) => (b.published || b.fetched_at).localeCompare(a.published || a.fetched_at),
       title: (a, b) => a.title.localeCompare(b.title),
     }[state.sort];
-    if (!(state.scope === "featured" && state.sort === "score" && currentIssue())) out.sort(by);
+    if (!(state.scope === "featured" && state.sort === "score" && currentPeriod())) out.sort(by);
     return out;
-  }
-
-  // ---------- how papers are chosen (rules come from config/analysis.yaml) ----------
-  function rulesNote() {
-    const s = DATA.selection;
-    if (!s) return "";
-    return `<details class="rules"><summary>How papers are chosen for the newsletter</summary>
-      <p>Every new paper with an abstract is scored from 0 to 10 for its relevance to markets research
-      (monetary policy, rates, FX, credit, financial stability, capital flows, the macro outlook) by a language model,
-      which also labels its market focus. The newsletter then takes the highest-scoring papers, between
-      ${s.min_papers} and ${s.max_papers} per issue, with three rules: a paper needs at least ${s.min_score} out of 10;
-      no source contributes more than ${s.max_per_source}, so one prolific institution cannot fill the issue; and if no
-      emerging-markets paper made the cut but one qualifies, it replaces the lowest-ranked pick.
-      Papers whose feed has no abstract get one looked up in OpenAlex, on the publisher's page or at the start of the
-      paper's own text. Where none exists anywhere (mostly JPE, which publishes no open abstracts), the market focus is
-      labelled from the title so the paper still counts in the coverage chart, but it is not scored and cannot be selected.
-      Data deposits and editorial notices are left out as not research.</p></details>`;
   }
 
   // ---------- issue band ----------
   function renderIssue() {
-    const issue = currentIssue();
+    const per = currentPeriod();
     const band = $("issue-band");
     const link = $("read-link");
-    if (!issue) {
-      band.innerHTML = issues.length
-        ? `<div><h2 id="issue-title">All issues</h2><p class="window">${issues.length} issue${issues.length > 1 ? "s" : ""} published, ${DATA.papers.filter(p => p.issues.length).length} papers in newsletters</p></div>`
-        : `<div><h2 id="issue-title">No issue published yet</h2><p class="window">Run <code>python main.py publish</code> to create the first issue. Every screened paper is listed below.</p></div>`;
+    const methodLink = `<p class="window" style="margin-top:12px"><a href="#method">How papers are scored and chosen</a></p>`;
+    if (!per) {
+      const n = DATA.papers.filter(p => p.issues.length).length;
+      band.innerHTML = `<div><h2 id="issue-title">All papers</h2><p class="window">Everything in the database, ${DATA.papers.length} publications.
+        ${issues.length} issue${issues.length === 1 ? "" : "s"} published so far, with ${n} papers in newsletters.
+        Papers published before the first issue's month were collected when the agent was set up.</p>${methodLink}</div>`;
       link.style.display = issues.length ? "" : "none";
       if (issues.length) link.href = `issues/${issues[0].id}.html`, link.textContent = `Read the ${issues[0].title} issue`;
       return;
     }
-    link.style.display = ""; link.href = `issues/${issue.id}.html`; link.textContent = "Read the newsletter";
-    const papers = issue.paper_uids.map(u => byUid[u]).filter(Boolean);
+    const prov = per.status === "in_progress";
+    link.style.display = prov ? "none" : ""; link.href = `issues/${per.id}.html`; link.textContent = "Read the newsletter";
+    const papers = per.paper_uids.map(u => byUid[u]).filter(Boolean);
     const counts = Object.fromEntries(FOCUS_KEYS.map(k => [k, papers.filter(p => p.focus === k).length]));
+    const issue = issues.find(i => i.id === per.id);
+    const late = per.late_uids && per.late_uids.length ? `, plus ${per.late_uids.length} from the month before that arrived after its issue went out` : "";
+    const window = prov
+      ? `In progress: research published ${fmtDate(per.window_start)} to ${fmtDate(per.window_end)}${late}. Updated daily; the issue goes out on ${nextMonthName(per.id)}.`
+      : `Research published ${fmtDate(per.window_start)} to ${lastDay(per.window_end)}${late}. ${papers.length} chosen for the newsletter from ${periodPapers().length} publications.`;
+    const intro = prov
+      ? `<p class="intro"><b>Provisional selection.</b> ${papers.length
+          ? `If the issue were made today, these ${papers.length} papers would be chosen from the ${periodPapers().length} publications so far. The ranking changes as new research comes in, and the write-ups (summary, key takeaways, why it matters) are produced only when the issue is published.`
+          : `No paper has been scored for this month yet.`}</p>`
+      : `<p class="intro">${esc(issue ? issue.intro : "")}</p>`;
     band.innerHTML = `
-      <div><h2 id="issue-title">${esc(issue.title)}</h2>
-        <p class="window">Research published ${fmtDate(issue.stats.window_start)} to ${fmtDate(issue.stats.window_end)}.
-        ${papers.length} chosen for the newsletter from ${DATA.papers.filter(p => inWindow(p, issue)).length} screened.</p></div>
-      <p class="intro">${esc(issue.intro)}</p>
-      <div class="strip-block">
-        <ul class="strip" aria-label="Papers in this newsletter, coloured by market focus">
+      <div><h2 id="issue-title">${esc(per.title)}${prov ? `<span class="badge">Provisional</span>` : ""}</h2>
+        <p class="window">${window}</p>${methodLink}</div>
+      ${intro}
+      ${papers.length ? `<div class="strip-block">
+        <ul class="strip${prov ? " provisional" : ""}" aria-label="${prov ? "Provisional picks" : "Papers in this newsletter"}, coloured by market focus">
           ${papers.map(p => `<li><button type="button" data-uid="${p.uid}" style="background:${VAR[p.focus]}"
               aria-pressed="${state.selected === p.uid}" aria-label="${esc(focusLabel(p.focus))}: ${esc(p.title)}"></button></li>`).join("")}
         </ul>
         <div class="strip-legend">${FOCUS_KEYS.filter(k => counts[k]).map(k =>
           `<span><span class="swatch" style="background:${VAR[k]}"></span>${counts[k]} ${esc(focusLabel(k).toLowerCase())}</span>`).join("")}</div>
-        ${rulesNote()}
-      </div>`;
+      </div>` : ""}`;
     band.querySelectorAll(".strip button").forEach(b => {
       b.addEventListener("click", () => { state.scope = "featured"; select(b.dataset.uid); render(); });
       b.addEventListener("mousemove", e => showTip(e, `<b>${esc(focusLabel(byUid[b.dataset.uid].focus))}</b><br>${esc(byUid[b.dataset.uid].title)}`));
@@ -382,17 +441,20 @@
   // ---------- list ----------
   function renderList(papers) {
     const list = $("list");
-    if (!papers.length) { list.innerHTML = `<li class="none">No papers match these filters. Clear the search or select more market focus labels.</li>`; return; }
+    if (!papers.length) { list.innerHTML = `<li class="none">No papers match these filters. Clear the search, select more market focus labels, or choose another period.</li>`; return; }
+    const featuredView = state.scope === "featured" && currentPeriod();
     list.innerHTML = papers.map(p => {
-      const sameIssue = state.scope === "featured" && currentIssue();
-      const featured = p.issues.length && !sameIssue ? `<span class="star">In the ${esc(p.issues.map(i => (issues.find(x => x.id === i) || {}).title || i).join(", "))} newsletter</span>` : "";
+      const tags = [];
+      if (p.issues.length && !(featuredView && !isProvisional()))
+        tags.push(`<span class="star">In the ${esc(p.issues.map(i => (issues.find(x => x.id === i) || {}).title || i).join(", "))} newsletter</span>`);
+      if (provisionalUids.has(p.uid) && !(featuredView && isProvisional())) tags.push(`<span class="prov">Provisional pick</span>`);
       const status = p.status === "excluded" ? `<span>No abstract, not yet labelled</span>`
         : (p.focus ? `<span style="color:${VAR[p.focus]};font-weight:600">${esc(focusLabel(p.focus))}</span>` : "")
           + (p.status === "title_only" ? `<span>Labelled from title</span>` : "");
       return `<li><button type="button" class="row" data-uid="${p.uid}" aria-current="${state.selected === p.uid}">
         <span class="bar" style="background:${p.focus ? VAR[p.focus] : "var(--none)"}"></span>
         <span><span class="t">${esc(p.title)}</span>
-          <span class="m">${status}<span>${esc(shortSrc(p.source))}</span><span>${fmtDate(p.published || p.fetched_at)}</span>${featured}</span></span>
+          <span class="m">${status}<span>${esc(shortSrc(p.source))}</span><span>${fmtDate(p.published || p.fetched_at)}</span>${tags.join("")}</span></span>
         <span class="s">${p.score != null ? `<b>${p.score}</b>of 10` : p.status === "title_only" ? `<span title="No abstract: not scored">n/a</span>` : ""}</span>
       </button></li>`;
     }).join("");
@@ -408,6 +470,9 @@
     if (!p) { d.classList.remove("open"); d.innerHTML = `<p class="detail-empty">Select a paper to see its summary, classification and metadata.</p>`; return; }
     const a = p.analysis;
     const color = p.focus ? VAR[p.focus] : "var(--muted)";
+    const prov = provisionalUids.has(p.uid) && !a
+      ? `<p class="pending-note"><strong>Provisional pick.</strong> On today's scores this paper would be in the ${esc(inProgress.title)} issue.
+         Its summary, key takeaways and "why it matters" are written when the issue is published on ${nextMonthName(inProgress.id)}.</p>` : "";
     d.innerHTML = `
       <button type="button" class="close" id="close">Close</button>
       ${p.focus ? `<span class="tag" style="color:${color};background:${TINT[p.focus]}">${esc(focusLabel(p.focus))}</span>` : ""}
@@ -419,7 +484,7 @@
         <h4>Why it matters</h4><p>${esc(a.relevance)}</p>
         <p class="focus-note" style="border-left-color:${color}"><strong>Why ${esc(focusLabel(p.focus).toLowerCase())}:</strong> ${esc(a.market_focus_rationale)}</p>`
       : p.status === "title_only" ? `<p class="focus-note" style="border-left-color:${color}"><strong>Labelled from the title:</strong> ${esc(TITLE_ONLY_NOTE)}${p.reason ? ` ${esc(p.reason)}` : ""}</p>`
-      : p.reason ? `<p class="focus-note" style="border-left-color:${color}"><strong>${p.status === "excluded" ? "Not yet labelled" : "Screening note"}:</strong> ${esc(p.reason)}</p>` : ""}
+      : p.reason ? `${prov}<p class="focus-note" style="border-left-color:${color}"><strong>${p.status === "excluded" ? "Not yet labelled" : "Screening note"}:</strong> ${esc(p.reason)}</p>` : prov}
       <dl class="facts">
         <dt>Source</dt><dd>${esc(srcName(p.source))}</dd>
         <dt>Published</dt><dd>${fmtDate(p.published) || "Not stated"}</dd>
@@ -440,46 +505,133 @@
   const rank = id => (DATA.sources[id] || {}).group_rank ?? 99;
   const groupOf = id => (DATA.sources[id] || {}).group || "Other";
   function renderCoverage() {
-    const issue = currentIssue();
-    const pool = issue ? DATA.papers.filter(p => inWindow(p, issue)) : DATA.papers;
-    const ids = Object.keys(DATA.sources).filter(id => pool.some(p => p.source === id) || (issue && issue.stats.coverage[id]));
+    const per = currentPeriod();
+    const pool = periodPapers();
+    const picks = new Set(per ? per.paper_uids : DATA.papers.filter(p => p.issues.length).map(p => p.uid));
+    const ids = Object.keys(DATA.sources).filter(id => pool.some(p => p.source === id));
     const rows = ids.map(id => {
       const ps = pool.filter(p => p.source === id);
       const r = { id, total: ps.length, na: ps.filter(p => p.status === "excluded").length,
-        pending: ps.filter(p => p.status === "pending").length, featured: ps.filter(p => p.issues.length).length,
+        featured: ps.filter(p => picks.has(p.uid)).length,
         titleOnly: ps.filter(p => p.status === "title_only").length };
       FOCUS_KEYS.forEach(k => {
         r[k] = ps.filter(p => (p.status === "scored" || p.status === "title_only") && p.focus === k).length;
         r[k + "_t"] = ps.filter(p => p.status === "title_only" && p.focus === k).length;
       });
-      r.scored = FOCUS_KEYS.reduce((s, k) => s + r[k], 0);
       return r;
     }).sort((a, b) => rank(a.id) - rank(b.id) || b.total - a.total);
     const max = Math.max(1, ...rows.map(r => r.total));
     const nTitle = rows.reduce((s, r) => s + r.titleOnly, 0);
-    $("cov-sub").textContent = (issue ? `Every publication screened for the ${issue.title} issue, by source and market focus.`
-      : "Every publication in the database, by source and market focus.")
-      + (nTitle ? ` ${nTitle} publications with no abstract anywhere (mostly JPE, which publishes none openly) are labelled from their title and counted here, but are not scored.` : "")
-      + (N_NONPAPER ? ` ${N_NONPAPER} non-research items (data deposits, editorial notices) are left out.` : "");
+    $("cov-title").textContent = per ? `Source coverage, ${per.title}${per.status === "in_progress" ? " (in progress)" : ""}` : "Source coverage, all papers";
+    $("cov-sub").textContent = (per
+        ? `${pool.length} publications from ${rows.length} sources, by market focus: everything published ${fmtDate(per.window_start)} to ${per.status === "in_progress" ? fmtDate(per.window_end) : lastDay(per.window_end)}${per.late_uids && per.late_uids.length ? `, plus ${per.late_uids.length} late arrivals from the month before` : ""}.`
+        : `${pool.length} publications from ${rows.length} sources in the database, by market focus.`)
+      + (nTitle ? ` ${nTitle} with no abstract anywhere (mostly JPE, which publishes none openly) are labelled from their title and counted here, but are not scored.` : "")
+      + (N_NONPAPER && !per ? ` ${N_NONPAPER} non-research items (data deposits, editorial notices) are left out.` : "")
+      + " Change the period with the selector at the top.";
     const anyNa = rows.some(r => r.na);
     $("chart-legend").innerHTML = FOCUS_KEYS.map(k => `<span><span class="swatch" style="background:${VAR[k]}"></span>${esc(focusLabel(k))}</span>`).join("")
       + (anyNa ? `<span><span class="swatch" style="background:repeating-linear-gradient(135deg,#dfe4ea 0 3px,#f2f4f7 3px 6px);border:1px solid #d5dbe3"></span>Not yet labelled</span>` : "");
     let lastGroup = null;
-    $("chart").innerHTML = rows.map(r => {
+    $("chart").innerHTML = rows.length ? rows.map(r => {
       const head = groupOf(r.id) !== lastGroup ? `<span class="grp">${esc(lastGroup = groupOf(r.id))}</span>` : "";
       const segs = FOCUS_KEYS.filter(k => r[k]).map(k =>
         `<span class="seg-bar" data-tip="${esc(shortSrc(r.id))}: ${r[k]} ${esc(focusLabel(k).toLowerCase())}${r[k + "_t"] ? ` (${r[k + "_t"] === r[k] ? "all" : r[k + "_t"]} labelled from title)` : ""}" style="width:${r[k] / max * 100}%;background:${VAR[k]}"></span>`).join("")
         + (r.na ? `<span class="seg-bar na" data-tip="${esc(shortSrc(r.id))}: ${r.na} without an abstract, not yet labelled" style="width:${r.na / max * 100}%"></span>` : "");
       return `${head}<span class="lbl">${esc(shortSrc(r.id))}</span><span class="track">${segs}</span><span class="tot">${r.total}</span>`;
-    }).join("");
+    }).join("") : `<p style="grid-column:1/-1;color:var(--muted)">No publications in this period yet.</p>`;
     $("chart").querySelectorAll("[data-tip]").forEach(s => {
       s.addEventListener("mousemove", e => showTip(e, esc(s.dataset.tip).replace(/^([^:]+):/, "<b>$1</b>:")));
       s.addEventListener("mouseleave", hideTip);
     });
+    const pickCol = per && per.status === "in_progress" ? "Provisional picks" : "In newsletter";
     $("cov-table").innerHTML = `<caption id="cov-table-caption" class="visually-hidden">Papers per source</caption>
-      <thead><tr><th scope="col">Source</th><th scope="col">Group</th><th scope="col">Screened</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Labelled from title</th>${anyNa ? `<th scope="col">Not yet labelled</th>` : ""}<th scope="col">In newsletter</th></tr></thead>
+      <thead><tr><th scope="col">Source</th><th scope="col">Group</th><th scope="col">Publications</th>${FOCUS_KEYS.map(k => `<th scope="col">${esc(k)}</th>`).join("")}<th scope="col">Labelled from title</th>${anyNa ? `<th scope="col">Not yet labelled</th>` : ""}<th scope="col">${pickCol}</th></tr></thead>
       <tbody>${rows.map(r => `<tr><td>${esc(srcName(r.id))}</td><td>${esc(groupOf(r.id))}</td>
         <td>${r.total}</td>${FOCUS_KEYS.map(k => `<td>${r[k]}</td>`).join("")}<td>${r.titleOnly}</td>${anyNa ? `<td>${r.na}</td>` : ""}<td>${r.featured}</td></tr>`).join("")}</tbody>`;
+  }
+
+  // ---------- how it works ----------
+  function renderMethod() {
+    if ($("method").dataset.done) return;
+    const srcGroups = {};
+    Object.values(DATA.sources).filter(s => !s.id.startsWith("other:")).sort((a, b) => a.group_rank - b.group_rank || a.name.localeCompare(b.name))
+      .forEach(s => (srcGroups[s.group] = srcGroups[s.group] || []).push(s.name));
+    const ex = inProgress || latestIssue;
+    $("method").innerHTML = `
+      <h2 id="method-title">How it works</h2>
+      <p class="lede">The Research Roundup is a monthly newsletter of the ${sel.min_papers} to ${sel.max_papers} most market-relevant
+      new papers from leading economics journals, central banks and research institutions. An automated agent reads every new
+      publication, scores it and picks the papers; a language model writes the summaries. This page explains the rules.</p>
+
+      <h3>The newsletter</h3>
+      <p>Each issue covers one calendar month: the October issue holds research published from 1 to 31 October and is
+      published on 1 November. For every chosen paper it gives a summary, the key takeaways, why it matters for markets,
+      and its market focus with the reason for it.</p>
+      <p>A paper dated in one month that only appears in a source after that month's issue has gone out is not lost: it joins the
+      next issue as a <em>late arrival</em>.</p>
+      <ol class="timeline">
+        <li><b>Every day</b>New publications are collected from all sources, missing abstracts are looked up, and each new paper is scored.</li>
+        <li><b>During the month</b>The dashboard shows the month in progress with a <em>provisional</em> selection: the papers that would be chosen if the issue were made that day.</li>
+        <li><b>On the 1st</b>The month that just ended is closed: the final ${sel.min_papers}–${sel.max_papers} papers are chosen, written up and published as the issue.</li>
+      </ol>
+
+      <h3>Relevance score (0 to 10)</h3>
+      <p>Every paper with an abstract is scored by a language model for its relevance to a markets research audience
+      (economists, and rates, FX and credit strategists). The model reads the title, the source and the abstract, and follows this scale:</p>
+      <table class="rubric"><tbody>
+        <tr><td class="n">9–10</td><td>Directly informs views on monetary policy, inflation, rates, FX, sovereign or corporate credit, banking and financial stability, capital flows or asset prices; timely, with clear and usable conclusions.</td></tr>
+        <tr><td class="n">6–8</td><td>Macro-financial, fiscal, trade, labour-market or growth research with clear implications for the macro outlook or markets.</td></tr>
+        <tr><td class="n">3–5</td><td>Solid economics with only indirect market implications, such as sectoral or micro studies with some macro angle.</td></tr>
+        <tr><td class="n">0–2</td><td>Little or no relevance to markets (health, education, history, methodology without application), or not a research paper.</td></tr>
+      </tbody></table>
+      <p>The score measures relevance to this audience, not the quality of the research.</p>
+
+      <h3>Market focus</h3>
+      <table class="rubric"><tbody>
+        <tr><th style="color:var(--em)">Emerging markets</th><td>The paper's data, setting or conclusions are mainly about emerging or developing economies: China, India, Brazil, Mexico, Turkey, South Africa, Latin America, Sub-Saharan Africa, frontier economies, EM spreads or capital flows to EMs.</td></tr>
+        <tr><th style="color:var(--dm)">Developed markets</th><td>Mainly about advanced economies: the United States, the euro area and its members, the United Kingdom, Japan, Canada, Australia, Switzerland, the Nordics. A study using only US data is classed here even if the mechanism is general.</td></tr>
+        <tr><th style="color:var(--tr)">Transversal</th><td>Relevant to both groups or specific to neither: panels mixing advanced and emerging economies, global phenomena (the global financial cycle, commodity prices, world trade), and theory or methods with no particular geography.</td></tr>
+      </tbody></table>
+      <p>The label follows where the evidence and conclusions apply, not where the authors work, and uses only the countries
+      and data the paper names.</p>
+
+      <h3>How papers are chosen</h3>
+      <ul>
+        <li>The highest-scoring papers of the month are taken, between ${sel.min_papers} and ${sel.max_papers} per issue.</li>
+        <li>A paper needs at least ${sel.min_score} out of 10.</li>
+        <li>No source contributes more than ${sel.max_per_source}, so one prolific institution cannot fill the issue.</li>
+        <li>If no emerging-markets paper made the cut but one qualifies, it replaces the lowest-ranked pick.</li>
+      </ul>
+
+      <h3>Papers without an abstract</h3>
+      <p>When a source gives no abstract, the agent looks for one in OpenAlex, on the publisher's page, and at the start of the
+      paper's own text. Where none exists anywhere (mostly the Journal of Political Economy, which publishes no open abstracts,
+      and some short Fed speeches and blog posts), the market focus is labelled from the title alone. These papers appear in the
+      lists and the coverage chart marked <em>Labelled from title</em>, but are not scored and cannot be chosen: a title is too
+      little to rank on. Data deposits and editorial notices are left out as not research.</p>
+
+      <h3>The write-ups</h3>
+      <p>Summaries, key takeaways and "why it matters" are written by a language model for the chosen papers only. Where the paper's
+      full text is openly available (a PDF or web page), the model reads it, so the takeaways can quote the actual estimates;
+      otherwise it works from the abstract. Each paper says which it was. No paywall or site protection is bypassed. The text may
+      contain errors: check the original paper before relying on a finding.</p>
+
+      <h3>Reading the dashboard</h3>
+      <dl class="glossary">
+        <dt>Period selector</dt><dd>Choose a published issue, the month in progress, or all papers. Every view follows it.</dd>
+        <dt>In the newsletter</dt><dd>The papers chosen for the selected issue.</dd>
+        <dt>Provisional pick</dt><dd>For the month in progress: a paper that would be chosen on today's scores. It can still change.</dd>
+        <dt>All papers</dt><dd>Every publication in the selected period, chosen or not.</dd>
+        <dt>Published this week</dt><dd>Publications dated in the last seven days.</dd>
+        <dt>Relevance, “6 of 10”</dt><dd>The relevance score above.</dd>
+        <dt>Labelled from title, “n/a”</dt><dd>No abstract was available: market focus from the title only, no score.</dd>
+        <dt>Source coverage</dt><dd>How many publications each source contributed in the period, by market focus.</dd>
+      </dl>
+
+      <h3>Sources</h3>
+      <div class="src-groups">${Object.entries(srcGroups).map(([g, names]) => `<div><b>${esc(g)}</b>${names.map(esc).join(", ")}</div>`).join("")}</div>`;
+    $("method").dataset.done = "1";
   }
 
   // ---------- tooltip ----------
@@ -490,13 +642,18 @@
 
   // ---------- render ----------
   function render() {
+    hideTip();
+    if (state.view === "method") { renderMethod(); return; }
+    if (state.view === "coverage") { renderCoverage(); return; }
+    const per = currentPeriod();
     $("scope").querySelectorAll("button").forEach(b => {
       b.setAttribute("aria-pressed", b.dataset.scope === state.scope);
       const n = b.dataset.scope === "featured"
-        ? (currentIssue() ? currentIssue().paper_uids.length : DATA.papers.filter(p => p.issues.length).length)
-        : b.dataset.scope === "week" ? DATA.papers.filter(isNewThisWeek).length
-        : (currentIssue() ? DATA.papers.filter(p => inWindow(p, currentIssue())).length : DATA.papers.length);
-      const label = { featured: "In the newsletter", screened: "All screened", week: "New this week" }[b.dataset.scope];
+        ? (per ? per.paper_uids.length : DATA.papers.filter(p => p.issues.length).length)
+        : b.dataset.scope === "week" ? periodPapers().filter(isNewThisWeek).length
+        : periodPapers().length;
+      const label = { featured: per && per.status === "in_progress" ? "Provisional picks" : "In the newsletter",
+                      screened: "All papers", week: "Published this week" }[b.dataset.scope];
       b.textContent = `${label} (${n})`;
     });
     renderIssue();
@@ -508,14 +665,13 @@
     if (!state.selected && papers.length && window.innerWidth > 900) state.selected = papers[0].uid;
     renderList(papers);
     renderDetail();
-    renderCoverage();
   }
 
   $("footer").innerHTML = `Data updated ${fmtDate(DATA.generated_at)}. ${DATA.papers.length} publications in the database from ${new Set(DATA.papers.map(p => p.source)).size} sources.
-    Summaries and classifications are produced by a language model from titles and abstracts (and, for newsletter papers, the open full text where available) and may contain errors. <a href="data/site.json">Download the data (JSON)</a>.
+    Summaries and classifications are produced by a language model and may contain errors. <a href="#method">How it works</a> · <a href="data/site.json">Download the data (JSON)</a>.
     ${DISCLAIMER ? `<br>${esc(DISCLAIMER)}` : ""}`;
   document.addEventListener("keydown", e => { if (e.key === "Escape" && $("detail").classList.contains("open") && window.innerWidth <= 900) { state.selected = null; render(); } });
-  render();
+  setView();
 })();
 </script>
 </body>
