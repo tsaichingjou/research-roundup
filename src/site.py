@@ -129,14 +129,18 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
     }
 
 
-def add_periods(data: dict, in_progress: dict | None) -> None:
+def add_periods(data: dict, in_progress: list[dict] | dict | None) -> None:
     """Give the dashboard its periods (the month in progress, then each issue) and
     tag every paper with the one period it belongs to."""
     periods = []
-    if in_progress and not any(i["id"] == in_progress["id"] for i in data["issues"]):
-        periods.append({**{k: in_progress[k] for k in ("id", "title", "window_start", "window_end",
-                                                       "paper_uids", "late_uids")},
-                        "status": "in_progress", "pool": set(in_progress["pool_uids"])})
+    if isinstance(in_progress, dict):
+        in_progress = [in_progress]
+    for ip in in_progress or []:
+        if any(i["id"] == ip["id"] for i in data["issues"]):
+            continue
+        periods.append({**{k: ip.get(k) for k in ("id", "title", "window_start", "window_end",
+                                                  "paper_uids", "late_uids", "closing", "publish_on")},
+                        "status": "in_progress", "pool": set(ip["pool_uids"])})
     for i in data["issues"]:
         st = i["stats"]
         pool = set(st.get("pool_uids") or [])
@@ -155,7 +159,7 @@ def add_periods(data: dict, in_progress: dict | None) -> None:
 
 def build_site(storage: Storage, sources_cfg: dict, site_cfg: dict,
                out_dir: Path | None = None, selection: dict | None = None,
-               in_progress: dict | None = None) -> dict:
+               in_progress: list[dict] | dict | None = None, publish_day: int | None = None) -> dict:
     out = Path(out_dir or ROOT / site_cfg.get("output_dir", "docs"))
     (out / "issues").mkdir(parents=True, exist_ok=True)
     (out / "data").mkdir(parents=True, exist_ok=True)
@@ -173,6 +177,7 @@ def build_site(storage: Storage, sources_cfg: dict, site_cfg: dict,
     (out / "data" / "site.json").write_text(payload, encoding="utf-8")
     embedded = payload.replace("</", "<\\/")  # safe inside a <script> element
     html = env.get_template("dashboard.html.j2").render(site=site_cfg, data_json=embedded,
+                                                        publish_day=int(publish_day or 5),
                                                         has_issues=bool(data["issues"]))
     (out / "index.html").write_text(html, encoding="utf-8")
     (out / ".nojekyll").write_text("")  # serve files as-is on GitHub Pages

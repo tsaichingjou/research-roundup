@@ -293,7 +293,7 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "";
   const lastDay = iso => { const d = new Date(iso); if (d.getUTCDate() === 1 && d.getUTCHours() === 0) d.setUTCDate(0); return fmtDate(d.toISOString()); };
-  const nextMonthName = id => { const [y, m] = id.split("-").map(Number); return new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }); };
+  const longDate = iso => iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : "";
   const srcName = id => (DATA.sources[id] || {}).name || id;
   const shortSrc = id => (DATA.sources[id] || {}).short || srcName(id);
   const focusLabel = f => f === "Transversal" ? "Transversal" : FOCUS[f].name;
@@ -301,10 +301,13 @@
 
   // Default: the latest published issue (what a reader comes for); else the month in progress.
   const latestIssue = periods.find(x => x.status === "published");
-  const inProgress = periods.find(x => x.status === "in_progress");
+  const pending = periods.filter(x => x.status === "in_progress");   // not yet published, newest first
+  const closingMonth = pending.find(x => x.closing);
+  const PUBLISH_DAY = {{ publish_day }};
+  const ordinal = n => n + (["th", "st", "nd", "rd"][(n % 100 - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
   const state = {
     view: "papers",
-    period: (latestIssue || inProgress || { id: "all" }).id,
+    period: (latestIssue || closingMonth || pending[0] || { id: "all" }).id,
     scope: periods.length ? "featured" : "screened",
     focus: new Set(FOCUS_KEYS), source: "all", sort: "score", q: "", selected: null,
   };
@@ -322,7 +325,7 @@
 
   // ---------- period selector ----------
   const periodSel = $("issue-select");
-  periodSel.innerHTML = periods.map(x => `<option value="${x.id}">${esc(x.title)} ${x.status === "in_progress" ? "(in progress)" : "issue"}</option>`).join("")
+  periodSel.innerHTML = periods.map(x => `<option value="${x.id}">${esc(x.title)} ${x.status !== "in_progress" ? "issue" : x.closing ? `(closing, out ${fmtDate(x.publish_on).replace(/ \d{4}$/, "")})` : "(in progress)"}</option>`).join("")
     + `<option value="all">All papers</option>`;
   periodSel.value = state.period;
   periodSel.addEventListener("change", () => { state.period = periodSel.value; state.selected = null; render(); });
@@ -348,7 +351,7 @@
   const currentPeriod = () => periods.find(x => x.id === state.period);
   const isProvisional = () => (currentPeriod() || {}).status === "in_progress";
   const periodPapers = () => state.period === "all" ? DATA.papers : DATA.papers.filter(p => p.period === state.period);
-  const provisionalUids = new Set(inProgress ? inProgress.paper_uids : []);
+  const provisionalOf = Object.fromEntries(pending.flatMap(x => x.paper_uids.map(u => [u, x])));
   // "Published this week": publication date (or first seen, if undated) in the 7 days to the latest update.
   const WEEK_START = new Date(new Date(DATA.generated_at).getTime() - 7 * 864e5).toISOString().slice(0, 10);
   const isNewThisWeek = p => (p.published || p.fetched_at).slice(0, 10) >= WEEK_START;
@@ -398,7 +401,9 @@
     const issue = issues.find(i => i.id === per.id);
     const late = per.late_uids && per.late_uids.length ? `, plus ${per.late_uids.length} from the month before that arrived after its issue went out` : "";
     const window = prov
-      ? `In progress: research published ${fmtDate(per.window_start)} to ${fmtDate(per.window_end)}${late}. Updated daily; the issue goes out on ${nextMonthName(per.id)}.`
+      ? (per.closing
+          ? `Closing: research published ${fmtDate(per.window_start)} to ${lastDay(per.window_end)}${late}. Papers from this month that reach the sources late are still being added; the issue goes out on ${longDate(per.publish_on)}.`
+          : `In progress: research published ${fmtDate(per.window_start)} to ${fmtDate(per.window_end)}${late}. Updated daily; the issue goes out on ${longDate(per.publish_on)}.`)
       : `Research published ${fmtDate(per.window_start)} to ${lastDay(per.window_end)}${late}. ${papers.length} chosen for the newsletter from ${periodPapers().length} publications.`;
     const intro = prov
       ? `<p class="intro"><b>Provisional selection.</b> ${papers.length
@@ -447,7 +452,7 @@
       const tags = [];
       if (p.issues.length && !(featuredView && !isProvisional()))
         tags.push(`<span class="star">In the ${esc(p.issues.map(i => (issues.find(x => x.id === i) || {}).title || i).join(", "))} newsletter</span>`);
-      if (provisionalUids.has(p.uid) && !(featuredView && isProvisional())) tags.push(`<span class="prov">Provisional pick</span>`);
+      if (provisionalOf[p.uid] && !(featuredView && isProvisional())) tags.push(`<span class="prov">Provisional pick</span>`);
       const status = p.status === "excluded" ? `<span>No abstract, not yet labelled</span>`
         : (p.focus ? `<span style="color:${VAR[p.focus]};font-weight:600">${esc(focusLabel(p.focus))}</span>` : "")
           + (p.status === "title_only" ? `<span>Labelled from title</span>` : "");
@@ -470,9 +475,10 @@
     if (!p) { d.classList.remove("open"); d.innerHTML = `<p class="detail-empty">Select a paper to see its summary, classification and metadata.</p>`; return; }
     const a = p.analysis;
     const color = p.focus ? VAR[p.focus] : "var(--muted)";
-    const prov = provisionalUids.has(p.uid) && !a
-      ? `<p class="pending-note"><strong>Provisional pick.</strong> On today's scores this paper would be in the ${esc(inProgress.title)} issue.
-         Its summary, key takeaways and "why it matters" are written when the issue is published on ${nextMonthName(inProgress.id)}.</p>` : "";
+    const pp = provisionalOf[p.uid];
+    const prov = pp && !a
+      ? `<p class="pending-note"><strong>Provisional pick.</strong> On today's scores this paper would be in the ${esc(pp.title)} issue.
+         Its summary, key takeaways and "why it matters" are written when the issue is published on ${longDate(pp.publish_on)}.</p>` : "";
     d.innerHTML = `
       <button type="button" class="close" id="close">Close</button>
       ${p.focus ? `<span class="tag" style="color:${color};background:${TINT[p.focus]}">${esc(focusLabel(p.focus))}</span>` : ""}
@@ -557,7 +563,6 @@
     const srcGroups = {};
     Object.values(DATA.sources).filter(s => !s.id.startsWith("other:")).sort((a, b) => a.group_rank - b.group_rank || a.name.localeCompare(b.name))
       .forEach(s => (srcGroups[s.group] = srcGroups[s.group] || []).push(s.name));
-    const ex = inProgress || latestIssue;
     $("method").innerHTML = `
       <h2 id="method-title">How it works</h2>
       <p class="lede">The Research Roundup is a monthly newsletter of the ${sel.min_papers} to ${sel.max_papers} most market-relevant
@@ -566,14 +571,15 @@
 
       <h3>The newsletter</h3>
       <p>Each issue covers one calendar month: the October issue holds research published from 1 to 31 October and is
-      published on 1 November. For every chosen paper it gives a summary, the key takeaways, why it matters for markets,
+      published on ${PUBLISH_DAY} November. For every chosen paper it gives a summary, the key takeaways, why it matters for markets,
       and its market focus with the reason for it.</p>
-      <p>A paper dated in one month that only appears in a source after that month's issue has gone out is not lost: it joins the
-      next issue as a <em>late arrival</em>.</p>
+      <p>The issue goes out on the ${ordinal(PUBLISH_DAY)} rather than the 1st because some papers reach the sources (or the
+      OpenAlex index) a few days after their publication date: the wait lets them into their own month. A paper that appears
+      even later is not lost: it joins the next issue as a <em>late arrival</em>.</p>
       <ol class="timeline">
         <li><b>Every day</b>New publications are collected from all sources, missing abstracts are looked up, and each new paper is scored.</li>
-        <li><b>During the month</b>The dashboard shows the month in progress with a <em>provisional</em> selection: the papers that would be chosen if the issue were made that day.</li>
-        <li><b>On the 1st</b>The month that just ended is closed: the final ${sel.min_papers}–${sel.max_papers} papers are chosen, written up and published as the issue.</li>
+        <li><b>During the month</b>The dashboard shows the month in progress, and until the ${ordinal(PUBLISH_DAY)} the month just ended, with a <em>provisional</em> selection: the papers that would be chosen if the issue were made that day.</li>
+        <li><b>On the ${ordinal(PUBLISH_DAY)} of the next month</b>The month is closed: the final ${sel.min_papers}–${sel.max_papers} papers are chosen, written up and published as the issue.</li>
       </ol>
 
       <h3>Relevance score (0 to 10)</h3>
@@ -619,7 +625,7 @@
 
       <h3>Reading the dashboard</h3>
       <dl class="glossary">
-        <dt>Period selector</dt><dd>Choose a published issue, the month in progress, or all papers. Every view follows it.</dd>
+        <dt>Period selector</dt><dd>Choose a published issue, a month not yet published (in progress, or closing until the ${ordinal(PUBLISH_DAY)}), or all papers. Every view follows it.</dd>
         <dt>In the newsletter</dt><dd>The papers chosen for the selected issue.</dd>
         <dt>Provisional pick</dt><dd>For the month in progress: a paper that would be chosen on today's scores. It can still change.</dd>
         <dt>All papers</dt><dd>Every publication in the selected period, chosen or not.</dd>

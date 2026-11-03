@@ -32,7 +32,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from src.analysis import load_analysis_config, provisional, run_analysis, run_screening  # noqa: E402
+from src.analysis import load_analysis_config, provisional_periods, run_analysis, run_screening  # noqa: E402
 from src.enrich import run_enrichment  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
 from src.evaluation import evaluate, export_sample, format_report  # noqa: E402
@@ -215,7 +215,8 @@ def main() -> int:
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
         out_dir = ROOT / os.environ.get("RR_SITE_DIR", site_cfg.get("output_dir", "site"))
         res = build_site(storage, config, site_cfg, out_dir=out_dir, selection=acfg["selection"],
-                         in_progress=provisional(storage, acfg))
+                         in_progress=provisional_periods(storage, acfg),
+                         publish_day=(acfg.get("schedule") or {}).get("publish_day", 5))
         out = res["out_dir"].relative_to(ROOT)
         print(f"Site built in {out}/: {len(res['issues'])} issue(s), {res['papers']} papers.")
         print(f"Open {out}/index.html in a browser to preview it.")

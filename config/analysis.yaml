@@ -25,8 +25,10 @@ llm:
   min_interval_seconds: 4     # spacing between calls, to stay inside free-tier RPM limits
   timeout_seconds: 90         # a model that times out or returns 5xx twice is skipped for the next one
 
-window:
-  days: 31                    # an issue covers papers first seen or published in the last N days
+schedule:
+  publish_day: 5              # an issue covers one calendar month and is closed on this day of the
+                              # next month, so papers indexed a few days late still make it in.
+                              # Keep in step with the monthly cron in .github/workflows/pipeline.yml.
 
 enrichment:                   # recover missing abstracts before excluding a paper (src/enrich.py)
   enabled: true

@@ -64,7 +64,7 @@ suite without network access or API keys.
 | When | Job | Steps |
 |---|---|---|
 | Every day, 05:23 UTC | Daily screening | `fetch` (with abstract recovery) → `screen` → `build` (refreshes the month in progress and its provisional picks) |
-| 1st of the month, 06:17 UTC | Monthly issue | `fetch` → `publish` (select from the month that just ended, write up, freeze the issue, build) |
+| 5th of the month, 06:17 UTC | Monthly issue | `fetch` → `publish` (select from the month that just ended, write up, freeze the issue, build) |
 | On demand | Daily, monthly or republish | "Run workflow" button in the Actions tab; *republish* retries every missing abstract and rewrites last month's issue (`enrich --retry-all` → `publish --rewrite`), e.g. after a prompt change |
 
 Each run commits its database (`data/published.db`) and the built site
@@ -80,13 +80,20 @@ Setting up a fork: add the repository secrets `GEMINI_API_KEY` (required) and
 *GitHub Actions*, then start the workflow once from the Actions tab.
 
 **Periods.** Each issue covers one calendar month: the October issue holds
-research published 1-31 October and is produced on 1 November; re-running it
-later (`publish --rewrite`, or `--month 2026-10`) keeps the same window. A paper
-dated in October that only reaches a source after the October issue went out
-joins the November issue as a *late arrival* (counted in the newsletter's notes),
-so nothing is lost to indexing delays. During the month the explorer shows the
-month in progress with a provisional selection: the papers that would be chosen
-if the issue were made that day.
+research published 1-31 October. It is closed on 5 November rather than the
+1st (`schedule.publish_day` in `config/analysis.yaml`), because some papers
+reach the feeds or the OpenAlex index a few days after their publication date;
+the wait lets them into their own month. A paper that appears even later joins
+the November issue as a *late arrival* (counted in the newsletter's notes), so
+nothing is lost. Re-running an issue later (`publish --rewrite`, or
+`--month 2026-10`) keeps the same window. Until an issue is closed, the explorer
+shows the month with a provisional selection, the papers that would be chosen
+if the issue were made that day: the month in progress, and from the 1st to the
+5th also the month that is closing.
+
+A write-up produced by a fallback model (when the preferred model was
+overloaded or out of daily quota) is retried with the preferred model the next
+time the issue is built, and kept if that fails again.
 
 **Daily vs monthly.** The brief asks the agent to monitor weekly publications
 and publish a monthly newsletter. Screening runs daily (a few cheap batch calls)

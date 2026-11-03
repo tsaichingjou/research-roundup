@@ -237,12 +237,17 @@ def analyse_paper(paper: dict, client: JSONModel, full_text=None) -> dict:
 
 # --- Periods ------------------------------------------------------------------------
 # An issue covers one calendar month: the October issue holds research published
-# 1-31 October and is produced on 1 November. The month in progress is screened
-# every day and shown on the dashboard with a provisional selection.
+# 1-31 October. It is closed on the publish day of the next month (the 5th by
+# default, `schedule.publish_day`), so papers that reach a source a few days late
+# still make it into their own month. Until then, the month is shown on the
+# dashboard with a provisional selection, as is the month in progress.
 #
 # Late arrivals: a paper dated in the previous month that only reached a source
 # (or OpenAlex) after that month's issue went out is not lost; it joins the next
 # issue. Before the first issue there is nothing to be late for.
+
+def publish_day(cfg: dict) -> int:
+    return int((cfg.get("schedule") or {}).get("publish_day", 5))
 
 def month_of(now: datetime) -> str:
     return now.strftime("%Y-%m")
@@ -268,9 +273,11 @@ def paper_date(p: dict) -> str:
     return (p.get("published") or p.get("fetched_at") or "")[:10]
 
 
-def month_pool(storage: Storage, month: str) -> tuple[list[dict], list[str]]:
+def month_pool(storage: Storage, month: str, rebuilding: bool = False) -> tuple[list[dict], list[str]]:
     """Papers that belong to `month`'s issue: those dated in the month, plus late
-    arrivals from the month before. Returns (papers, uids of the late arrivals)."""
+    arrivals from the month before. Returns (papers, uids of the late arrivals).
+    `rebuilding=True` when (re)making this month's own issue: papers that arrived
+    after an earlier version of it are then included rather than passed on."""
     issues = storage.get_issues()
     in_other = {u for i in issues if i["id"] != month for u in i["paper_uids"]}
     prev = previous_month(month)
@@ -281,7 +288,7 @@ def month_pool(storage: Storage, month: str) -> tuple[list[dict], list[str]]:
         d = paper_date(p)
         if d[:7] == month:
             # arrived after this month's issue went out: it is a late arrival for the next one
-            if this_issue and p["uid"] not in this_issue["paper_uids"] \
+            if this_issue and not rebuilding and p["uid"] not in this_issue["paper_uids"] \
                     and p["fetched_at"] > this_issue["published_at"]:
                 continue
             if p["uid"] not in in_other:
@@ -294,17 +301,32 @@ def month_pool(storage: Storage, month: str) -> tuple[list[dict], list[str]]:
     return pool, late
 
 
-def provisional(storage: Storage, cfg: dict, now: datetime | None = None) -> dict:
-    """The selection the month in progress would get if its issue were made today."""
+def provisional_periods(storage: Storage, cfg: dict, now: datetime | None = None) -> list[dict]:
+    """Months not yet published, newest first: the month in progress, and, until
+    the publish day, the month that just ended and is still collecting late papers."""
     now = now or datetime.now(timezone.utc)
-    month = month_of(now)
-    pool, late = month_pool(storage, month)
+    out = [provisional(storage, cfg, now, month_of(now))]
+    prev = previous_month(month_of(now))
+    if now.day < publish_day(cfg) and not storage.get_issue(prev):
+        out.append(provisional(storage, cfg, now, prev))
+    return out
+
+
+def provisional(storage: Storage, cfg: dict, now: datetime | None = None, month: str | None = None) -> dict:
+    """The selection a month not yet published would get if its issue were made today."""
+    now = now or datetime.now(timezone.utc)
+    month = month or month_of(now)
+    pool, late = month_pool(storage, month, rebuilding=True)
     screened = storage.get_screening()
     scored = [{**p, **screened[p["uid"]]} for p in pool if screened.get(p["uid"], {}).get("status") == "scored"]
     picks = select(scored, cfg) if scored else []
-    start, _ = month_bounds(month)
+    start, end = month_bounds(month)
+    closing = month != month_of(now)
+    y, m = map(int, next_month(month).split("-"))
     return {"id": month, "title": datetime.fromisoformat(start).strftime("%B %Y"),
-            "window_start": start, "window_end": now.isoformat(),
+            "window_start": start, "window_end": end if closing else now.isoformat(),
+            "closing": closing,
+            "publish_on": datetime(y, m, publish_day(cfg), tzinfo=timezone.utc).isoformat(),
             "paper_uids": [p["uid"] for p in picks], "pool_uids": [p["uid"] for p in pool],
             "late_uids": late, "n_scored": len(scored)}
 
@@ -361,7 +383,7 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
 
     # 1-2. pre-filter and screen papers not seen before (also run daily on its own)
     run_screening(storage, client, cfg, now)
-    candidates, late = month_pool(storage, month)
+    candidates, late = month_pool(storage, month, rebuilding=True)
     screened = storage.get_screening()
 
     # 3. select from everything scored in the month
@@ -375,6 +397,13 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
         log.info("Selected %d papers; writing up those without a cached analysis", len(selected))
     for i, p in enumerate(selected, 1):
         analysis = None if rewrite else storage.get_analysis(p["uid"])
+        preferred = (getattr(analysis_client, "candidates", None) or [None])[0]
+        if analysis is not None and preferred and analysis.get("model") not in (None, preferred):
+            # Written by a fallback model on a busy day: try again with the preferred
+            # one (the earlier write-up is kept if that fails too).
+            log.info("Rewriting '%s' (cached write-up is by the fallback model %s)",
+                     p["title"][:60], analysis.get("model"))
+            analysis = None
         if analysis is None:
             getattr(analysis_client, "prefer_first", lambda: None)()
             log.info("Writing up %d/%d with %s: %s", i, len(selected),
@@ -389,7 +418,7 @@ def run_analysis(storage: Storage, client: JSONModel, cfg: dict,
             except LLMAuthError:
                 raise
             except LLMError as exc:
-                previous = storage.get_analysis(p["uid"]) if rewrite else None
+                previous = storage.get_analysis(p["uid"])
                 if previous is None:
                     log.error("Skipping '%s': %s", p["title"][:60], exc)
                     continue
