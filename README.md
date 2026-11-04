@@ -16,21 +16,34 @@ selects 5–8 papers, writes them up and publishes the issue to GitHub Pages.
 
 - **Every source in the brief, 58 in all**: the five top journals, NBER, BPEA,
   the IMF and the BIS, the Federal Reserve Board and the 12 regional Feds, the
-  G10 central banks and the ECB, and 25 European national central banks, read
-  through RSS feeds and the Crossref and OpenAlex APIs rather than scraping.
+  G10 central banks and the ECB, and 25 European national central banks. They
+  are read through stable, documented channels rather than scraping: RSS feeds
+  (NBER, BIS, the Feds via Fed in Print), the Crossref API (journals and the IMF,
+  by ISSN) and the OpenAlex API (central banks by institution, BPEA, and missing
+  abstracts).
+- **Google Gemini, two models for two jobs**: a fast, cheap model
+  (`gemini-3.5-flash-lite`) scores and classifies every paper; a stronger one
+  (`gemini-3.6-flash`) writes up only the 5–8 selected papers. Each falls back
+  to another model when overloaded, every output records which model made it,
+  and a month runs inside the free tier.
+- **Scored and classified from the abstract**: each paper gets a relevance
+  score (0–10) and an EM / DM / Transversal label from its title, source and
+  abstract. Where the source gives no abstract, one is looked for in three
+  places (OpenAlex, the publisher's page, the opening of the paper's own text).
+  Papers with none anywhere are labelled from their title only, are not scored,
+  and can never be among the papers chosen for the newsletter.
+- **Write-ups from the full text**: the selected papers are written up from
+  their open PDF or web page where one exists, so the key takeaways quote actual
+  estimates; otherwise from the abstract, and each entry says which.
+- **Classification checked, not assumed**: two independent models agree on
+  96% of a stratified sample of 105 papers (Cohen's κ 0.94, EM 35/35); the
+  disagreements are listed for human review (see *Evaluating the classification*).
 - **Runs itself**: GitHub Actions fetches and scores new papers every day and
   publishes the issue on the 5th, with a catch-up that remakes an issue missed
   or delayed by GitHub, or written while the preferred model was overloaded.
 - **A calendar month per issue, nothing lost**: the October issue covers
   1–31 October and closes on 5 November, so papers indexed a few days late make
   their own month; anything later joins the next issue as a late arrival.
-- **Write-ups from the full text**: the selected papers are written up from
-  their open PDF or web page where one exists, so the key takeaways quote actual
-  estimates; papers without an abstract are looked up in three places before
-  being labelled from their title only and kept out of the selection.
-- **Classification checked, not assumed**: two independent models agree on
-  96% of a stratified sample of 105 papers (Cohen's κ 0.94, EM 35/35); the
-  disagreements are listed for human review (see *Evaluating the classification*).
 - **Honest about gaps**: JPE is only partly covered (no open abstracts) and BPEA
   has returned no papers so far; both are documented below, as are the limits
   of the agreement check.
