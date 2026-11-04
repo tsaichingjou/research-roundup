@@ -102,10 +102,34 @@ def test_model_agreement_finds_disagreements(tmp_path):
                     item["market_focus"] = "transversal"
             return out
     res = evaluation.model_agreement(store, ModelB(), CFG, per_class=4)
-    assert res["n"] == 12 and res["model_b"] == "model-b"
+    assert res["n"] == 12 and res["model_b"] == "model-b (12)"
     assert res["metrics"]["accuracy"] == pytest.approx(8 / 12)
     assert res["agree_by_class_a"] == {"EM": 0.0, "DM": 1.0, "Transversal": 1.0}
     n = evaluation.write_disagreements(res, tmp_path / "d.csv")
     assert n == 4
     report = evaluation.format_agreement(res)
     assert "not accuracy" in report and "Disagreements (4)" in report
+
+
+def test_model_agreement_retries_failed_batches_and_refuses_partial_results(tmp_path, monkeypatch):
+    from src.llm import LLMError
+    store = _store_with_screening(tmp_path)
+    monkeypatch.setattr(evaluation.time, "sleep", lambda s: None)
+
+    class Flaky(FakeClient):
+        model = "b"
+        fails = 2
+
+        def generate_json(self, prompt, system=""):
+            if self.fails:
+                self.fails -= 1
+                raise LLMError("503")
+            return super().generate_json(prompt, system)
+    res = evaluation.model_agreement(store, Flaky(), CFG, per_class=4, batch_size=4)
+    assert res["n"] == 12                                       # failed batches retried
+
+    class Down(FakeClient):
+        def generate_json(self, prompt, system=""):
+            raise LLMError("503")
+    with pytest.raises(ValueError, match="no report written"):
+        evaluation.model_agreement(store, Down(), CFG, per_class=4, rounds=2)

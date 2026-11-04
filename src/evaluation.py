@@ -24,6 +24,7 @@ from __future__ import annotations
 import csv
 import math
 import random
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -205,7 +206,8 @@ AGREEMENT_FIELDS = ["id", "source", "title", "abstract", "label_a", "label_b",
 
 
 def model_agreement(storage: Storage, client: JSONModel, cfg: dict, per_class: int = 35,
-                    seed: int = 7, batch_size: int = 20) -> dict:
+                    seed: int = 7, batch_size: int = 15, rounds: int = 4, pause: float = 90,
+                    min_coverage: float = 0.9) -> dict:
     """Re-label a stratified sample with a second, independent model and compare.
 
     Model A is the screening model (labels stored at screening time); model B is
@@ -227,11 +229,28 @@ def model_agreement(storage: Storage, client: JSONModel, cfg: dict, per_class: i
     for label in LABELS:
         pool = sorted((s for s in screened if s["market_focus"] == label), key=lambda s: s["uid"])
         sample += rng.sample(pool, min(per_class, len(pool)))
+    rng.shuffle(sample)        # mixed batches: a failed batch must not remove one class
     by_uid = {s["uid"]: s for s in sample}
 
-    fresh = screen([papers[s["uid"]] for s in sample], client,
-                   {**cfg, "screening": {**cfg["screening"], "batch_size": batch_size}})
-    b = {r["uid"]: r for r in fresh}
+    # The larger free-tier models are often overloaded (HTTP 503): retry the
+    # batches that failed, after a pause, a few times.
+    b: dict[str, dict] = {}
+    bcfg = {**cfg, "screening": {**cfg["screening"], "batch_size": batch_size}}
+
+    def keep(results):
+        for r in results:
+            b[r["uid"]] = {**r, "model": getattr(client, "model", "?")}
+    for attempt in range(rounds):
+        todo = [papers[s["uid"]] for s in sample if s["uid"] not in b]
+        if not todo:
+            break
+        if attempt:
+            time.sleep(pause)
+        getattr(client, "prefer_first", lambda: None)()
+        screen(todo, client, bcfg, on_batch=keep)
+    if len(b) < min_coverage * len(sample):
+        raise ValueError(f"Only {len(b)} of {len(sample)} papers were re-labelled (the second model "
+                         "was unavailable); no report written. Try again later.")
     rows = []
     for uid, r in b.items():
         a, p = by_uid[uid], papers[uid]
@@ -253,7 +272,7 @@ def model_agreement(storage: Storage, client: JSONModel, cfg: dict, per_class: i
     scored = [(r["score_a"], r["score_b"]) for r in rows if r["score_a"] is not None and r["score_b"] is not None]
     return {
         "model_a": sorted({s.get("model") for s in sample if s.get("model")}),
-        "model_b": getattr(client, "model", "?"),
+        "model_b": ", ".join(f"{m} ({n})" for m, n in Counter(r["model"] for r in b.values()).most_common()),
         "n_sample": len(sample), "n": len(rows), "metrics": m,
         "agree_by_class_a": per_class, "population_shares": dict(shares), "weighted_agreement": weighted,
         "score_mad": sum(abs(x - y) for x, y in scored) / len(scored) if scored else None,
@@ -280,8 +299,8 @@ def format_agreement(result: dict) -> str:
         "EM / DM / Transversal classification: agreement between two independent models",
         "",
         f"Model A (screening, labels stored when each paper was scored): {a}",
-        f"Model B (stronger model, re-labelled now with the same prompt and inputs): {result['model_b']}",
-        f"Sample: {result['n']} papers, stratified by model A's label "
+        f"Model B (stronger model, re-labelled now with the same prompt and inputs; papers per model): {result['model_b']}",
+        f"Sample: {result['n']} of {result['n_sample']} papers drawn, stratified by model A's label "
         f"(up to {max(Counter(r['label_a'] for r in result['rows']).values())} per class)",
         "",
         "This measures agreement, not accuracy: two models can make the same mistake.",
