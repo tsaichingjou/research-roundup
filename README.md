@@ -5,8 +5,12 @@ journals, central banks and research institutions, and produces a monthly
 HTML newsletter of 5–8 curated papers with plain-language summaries and an
 EM / DM / Transversal market classification.
 
-**Live newsletter and explorer:** <https://tsaichingjou.github.io/research-roundup/>
-(each issue is under `issues/YYYY-MM.html`; the explorer links to it).
+**Live links**
+
+- Interactive dashboard: <https://tsaichingjou.github.io/research-roundup/>
+- Latest newsletter (October 2026): <https://tsaichingjou.github.io/research-roundup/issues/2026-10.html>
+  (every issue is at `issues/YYYY-MM.html`, and the dashboard links to each)
+- How the scores, labels and selection work: <https://tsaichingjou.github.io/research-roundup/#method>
 
 The agent runs itself on GitHub Actions: every day it fetches and scores new
 publications, and on the 5th of each month it closes the month that just ended,
@@ -93,9 +97,10 @@ cd research-roundup
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env               # paste a free Gemini API key into .env
-python main.py fetch               # ~550 papers from 23 sources, a few minutes
-python main.py publish             # screen, select, write up, build the site
-open site/index.html               # the explorer; the newsletter is in site/issues/
+python main.py fetch               # ~700 papers from the 58 sources, a few minutes
+python main.py publish             # screen, select, write up last month's issue, build the site
+open site/index.html               # the dashboard (Windows: start site\index.html);
+                                   # the newsletter is in site/issues/
 ```
 
 A full first run makes roughly 70–90 Gemini calls (scoring in batches of 8,
