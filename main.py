@@ -277,8 +277,11 @@ def main() -> int:
     if args.command == "agreement":
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
         llm = acfg["llm"]
-        # Model B must differ from the screening model, or the check is meaningless.
-        second = [m for m in llm["analysis_models"] if m not in llm["screening_models"]]
+        # Model B must differ from the model that produced the stored labels (model A),
+        # or the check is meaningless. Stronger models first; another lite model as
+        # the fallback, since the free-tier quota of the larger models is small.
+        used = {s.get("model") for s in storage.get_screening().values() if s.get("status") == "scored"}
+        second = [m for m in dict.fromkeys(llm["analysis_models"] + llm["screening_models"]) if m not in used]
         client = GeminiClient(models=second, temperature=llm.get("temperature", 0.2),
                               min_interval_seconds=llm.get("min_interval_seconds", 4),
                               timeout=llm.get("timeout_seconds", 90))

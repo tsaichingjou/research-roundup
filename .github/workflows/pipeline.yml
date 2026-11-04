@@ -2,7 +2,7 @@
 #
 #   Daily   (05:23 UTC):           fetch new papers, recover abstracts, score them, refresh
 #                                  the dashboard (incl. the provisional picks of the month in progress)
-#   Monthly (5th, 06:17 UTC):      fetch, select 5-8 papers from the month that just ended,
+#   Monthly (5th, 10:17 UTC):      fetch, select 5-8 papers from the month that just ended,
 #                                  write them up, publish the issue
 #
 # Each run commits its database (data/published.db) and the built site (docs/)
@@ -14,7 +14,8 @@ name: Research Roundup pipeline
 on:
   schedule:
     - cron: "23 5 * * *"     # daily screening
-    - cron: "17 6 5 * *"     # monthly issue (5th: lets late-indexed papers into their month)
+    - cron: "17 10 5 * *"    # monthly issue (5th: lets late-indexed papers into their month;
+                             # 10:17 UTC: after the Gemini free-tier daily quota resets at 08:00 UTC)
   workflow_dispatch:
     inputs:
       mode:
@@ -63,7 +64,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "17 6 5 * *" ]; then
+          elif [ "${{ github.event.schedule }}" = "17 10 5 * *" ]; then
             echo "mode=monthly" >> "$GITHUB_OUTPUT"
           else
             echo "mode=daily" >> "$GITHUB_OUTPUT"

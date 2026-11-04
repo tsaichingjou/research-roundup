@@ -64,7 +64,7 @@ suite without network access or API keys.
 | When | Job | Steps |
 |---|---|---|
 | Every day, 05:23 UTC | Daily screening | `fetch` (with abstract recovery) → `screen` → `build` (refreshes the month in progress and its provisional picks) |
-| 5th of the month, 06:17 UTC | Monthly issue | `fetch` → `publish` (select from the month that just ended, write up, freeze the issue, build) |
+| 5th of the month, 10:17 UTC (after the Gemini daily quota resets) | Monthly issue | `fetch` → `publish` (select from the month that just ended, write up, freeze the issue, build) |
 | On demand | Daily, monthly or republish | "Run workflow" button in the Actions tab; *republish* retries every missing abstract and rewrites last month's issue (`enrich --retry-all` → `publish --rewrite`), e.g. after a prompt change |
 
 Each run commits its database (`data/published.db`) and the built site
