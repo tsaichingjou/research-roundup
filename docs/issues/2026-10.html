@@ -484,8 +484,42 @@
   <tr><td class="px" bgcolor="#eef1f5" style="padding:26px 40px 30px 40px; background:#eef1f5; font-family:&#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif; font-size:13px; line-height:1.6; color:#5a6577;">
     <p style="margin:0 0 8px 0; font-size:14px; font-weight:bold; color:#172033;">How this issue was made</p>
     <p style="margin:0 0 10px 0;">An automated agent screened 256 publications from 39 sources: everything published 1 Oct 2026 to 31 Oct 2026. 239 with a usable abstract were scored for market relevance by a language model, and the 8 above were selected, with at most two papers per source.</p>
-    <p style="margin:0 0 10px 0;">For 21 papers whose feed carried no abstract, a stand-in was recovered before screening: from OpenAlex, the publisher's page, or the opening of the paper's own text.</p>
-    <p style="margin:0 0 10px 0;">13 publications with no abstract anywhere were labelled by market focus from their titles only (6 from Journal of Political Economy, 4 from Federal Reserve Bank of St. Louis, 3 from Federal Reserve Bank of Dallas). A title is too little to rank on, so they were not eligible for this issue.</p>
+    <p style="margin:0 0 6px 0;">Sources that needed a fallback because their feed gave no abstract, and how each paper was handled:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse; margin:0 0 12px 0; font-size:12px; line-height:1.4; color:#172033;">
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #c9d1da; font-weight:bold;">Source</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #c9d1da; font-weight:bold;">Papers</td>
+<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #c9d1da; font-weight:bold;">OpenAlex</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #c9d1da; font-weight:bold;">Publisher page</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #c9d1da; font-weight:bold;">Paper&#39;s own text</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #c9d1da; font-weight:bold;">Title only</td>      </tr>
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #e1e6ec;">Federal Reserve Bank of St. Louis</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #e1e6ec;">16</td>
+<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">10</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">4</td>      </tr>
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #e1e6ec;">Board of Governors of the Federal Reserve System</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #e1e6ec;">26</td>
+<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">6</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td>      </tr>
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #e1e6ec;">Journal of Political Economy</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #e1e6ec;">6</td>
+<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">6</td>      </tr>
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #e1e6ec;">Federal Reserve Bank of Dallas</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #e1e6ec;">12</td>
+<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">1</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">3</td>      </tr>
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #e1e6ec;">Bank for International Settlements (BIS)</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #e1e6ec;">9</td>
+<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">1</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">1</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td>      </tr>
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #e1e6ec;">Federal Reserve Bank of Cleveland</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #e1e6ec;">11</td>
+<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">1</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td>      </tr>
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #e1e6ec;">Federal Reserve Bank of Kansas City</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #e1e6ec;">7</td>
+<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">1</td><td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">–</td>      </tr>
+    </table>
+    <p style="margin:0 0 10px 0;">OpenAlex, publisher page and paper's own text: an abstract (or, for speeches and short articles, the opening paragraphs) was recovered and the paper was scored as usual. Title only: nothing was found anywhere (JPE publishes no open abstracts), so the paper was labelled by market focus from its title, not scored, and left out of the selection for this issue.</p>
     <p style="margin:0 0 10px 0;">Left out as not research papers:
 1 from Banco de Portugal (dataset, not a paper); 1 from Bank of Canada (dataset, not a paper); 1 from Deutsche Bundesbank (dataset, not a paper); 1 from Journal of Political Economy (not a research paper).    </p>
     <p style="margin:0 0 10px 0;">Market focus: <strong style="color:#a8680a;">Emerging markets</strong> for research centred on emerging or developing economies, <strong style="color:#2c5bb8;">Developed markets</strong> for advanced economies, and <strong style="color:#18876b;">Transversal</strong> for work spanning both or tied to neither.</p>
