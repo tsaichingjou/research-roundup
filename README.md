@@ -38,6 +38,11 @@ selects 5–8 papers, writes them up and publishes the issue to GitHub Pages.
 - **Classification checked, not assumed**: two independent models agree on
   96% of a stratified sample of 105 papers (Cohen's κ 0.94, EM 35/35); the
   disagreements are listed for human review (see *Evaluating the classification*).
+- **LLM quality kept up over time, automatically**: a frozen benchmark is
+  re-run whenever the prompt or the models change, every number in a write-up
+  is checked against the paper's text, and each issue gets a health report in
+  English, posted as a GitHub issue that GitHub emails to the owner (see
+  *Keeping LLM quality up*).
 - **Runs itself**: GitHub Actions fetches and scores new papers every day and
   publishes the issue on the 5th, with a catch-up that remakes an issue missed
   or delayed by GitHub, or written while the preferred model was overloaded.
@@ -71,6 +76,7 @@ sources.yaml ─► fetchers ─► SQLite ─► pre-filter ─► LLM screenin
 | `src/prompts.py` | Screening and analysis prompts, including the EM / DM / Transversal definitions. |
 | `src/enrich.py` | Recovers missing abstracts from OpenAlex, publisher pages or the opening of the paper's text before papers are written off. |
 | `src/fulltext.py` | Finds and reads a paper's open full text (PDF or web page) for the write-ups. |
+| `src/quality.py` | LLM quality over time: benchmark regression check, number grounding of write-ups, monthly health report. |
 | `src/analysis.py` | Pre-filter → batched screening → selection → deep analysis, all cached in SQLite. |
 | `src/issues.py` | Freezes the selection into a monthly issue with an editor's note; past issues never change. |
 | `src/site.py`, `templates/` | Builds the static site: one email-ready newsletter per issue and the interactive explorer. |
@@ -182,6 +188,9 @@ python main.py build                 # rebuild site/ from the database (no LLM c
 python main.py export-labels         # blind, stratified labelling sample -> evaluation/labels.csv
 python main.py evaluate              # compare LLM classification with the human labels
 python main.py evaluate --rerun      # same, re-classifying the sample with the current prompt
+python main.py agreement             # two-model agreement check -> evaluation/report.txt
+python main.py regression            # re-label the frozen benchmark with the current prompt and model
+python main.py quality-report        # monthly LLM health report for last month's issue
 python -m pytest -q                  # run tests (no network or API key needed)
 ```
 
@@ -431,10 +440,69 @@ that prompt tuning on `dev` errors does not inflate the `test` score. The
 cheapest first step is to label the disagreements file: where the two models
 agree, a shared error is less likely.
 
-## Roadmap
+## Keeping LLM quality up
 
-1. ~~Ingestion pipeline (NBER, BIS, IMF, top-5 journals)~~
-2. ~~LLM analysis module — relevance score, summary, key takeaways, EM/DM/Transversal with rationale~~
-3. ~~Responsive, email-safe HTML newsletter and interactive explorer~~
-4. ~~Remaining sources: G10 and European central banks, 12 regional Fed banks, BPEA~~
-5. ~~Daily fetch / monthly publish with GitHub Actions, deployed to GitHub Pages~~
+The agreement check above shows the classification is sound today. Three
+automatic layers (`src/quality.py`) keep it that way as prompts, models and
+sources change, without a reviewer in the loop:
+
+**1. Regression check when the system changes.** The 105 papers of the first
+agreement check are frozen in `evaluation/benchmark.csv`, each with the label
+both models agreed on (the 4 disputed papers carry none and do not count). A
+second workflow, `quality-check.yml`, runs whenever `src/prompts.py`,
+`config/analysis.yaml` or the benchmark changes: it re-labels the benchmark with
+the new prompt and screening model and compares. Below 90% agreement it opens a
+GitHub issue listing the papers whose label changed, so a prompt edit or a model
+retired by Google cannot quietly change how papers are classified. The latest
+result is kept in `evaluation/regression.md`. Cost: about 14 lite-model calls
+per change.
+
+**2. A health report for every issue.** After an issue is published (or remade
+by the catch-up), `quality-report` writes a short report in English and the
+workflow posts it as a GitHub issue, one per month, which GitHub emails to the
+repository owner; reports are also kept in `evaluation/quality/`. It needs no
+extra LLM calls and flags:
+
+| Check | Alert when |
+|---|---|
+| Classification consistency | the screening and writing models disagree on more than a quarter of the selected papers |
+| Market-focus mix | a class's share moves more than 15 points from the previous three months, or EM drops to zero |
+| Relevance scores | the month's mean moves more than one point from the previous three months |
+| Write-up model | any write-up was produced by a fallback model |
+| Numbers checked against the source | any number in a write-up is not in the paper's text (layer 3) |
+| Screening coverage | more than 10% of the month's papers were left unscreened (LLM failures) |
+
+The full-text share is reported for information. Mix and score comparisons are
+skipped when either side has fewer than 30 papers.
+
+**3. Number grounding in every write-up.** Key takeaways quote estimates, and
+a wrong figure is the most damaging error a summary can make. Every number in a
+summary or takeaway must appear in the text the model was given (the full text
+or the abstract; "10" also matches "ten"). If one does not, the model is asked
+once to rewrite without it; numbers still unverified are stored with the
+write-up and listed in the monthly report. This runs as part of each write-up,
+at the cost of one extra call only when a number fails.
+
+## What's built
+
+- ✅ Ingestion of every source in the brief: RSS, Crossref and OpenAlex, with abstract recovery
+- ✅ LLM analysis: relevance score, summary, key takeaways, why it matters, EM / DM / Transversal with rationale, written from the full text where open
+- ✅ Responsive, email-ready HTML newsletter and an interactive dashboard (papers, source coverage, how it works)
+- ✅ Daily screening and monthly publishing on GitHub Actions, deployed to GitHub Pages, with a catch-up safety net
+- ✅ Classification evaluation (two-model agreement) and automatic LLM quality monitoring
+
+## Next steps
+
+With more time, in rough order of value:
+
+1. **Accuracy against expert labels.** Have an economist label the blind sample
+   (`export-labels`), starting with the 4 disagreements, to measure accuracy
+   rather than agreement.
+2. **Email delivery.** The newsletter HTML is already email-safe; sending it
+   needs only the firm's mail service and a distribution list.
+3. **BPEA from brookings.edu** while OpenAlex has no recent records.
+4. **Wider EM coverage**: central banks of large emerging economies (Brazil,
+   India, Mexico, South Africa and others), configured but switched off to keep
+   to the brief's scope.
+5. **Reader feedback** (which papers are opened or rated useful) to tune the
+   relevance scale and selection rules.

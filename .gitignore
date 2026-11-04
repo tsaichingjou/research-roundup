@@ -7,3 +7,5 @@ data/openalex_ids.json
 site/
 .env
 output/*.json
+quality-post.md
+quality-post-title.txt

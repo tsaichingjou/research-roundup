@@ -40,6 +40,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+      issues: write        # the monthly LLM quality report is posted as an issue
     steps:
       - uses: actions/checkout@v5
 
@@ -82,12 +83,15 @@ jobs:
           # Safety net for the monthly run (delayed or skipped by GitHub, or written by a
           # fallback model): from the 5th to the 8th, (re)make last month's issue if needed.
           python main.py catch-up || echo "::warning::Catch-up failed; it is retried tomorrow."
+          python main.py quality-report      # only writes when the issue was (re)made
           python main.py build
 
       - name: Monthly — select, write up and publish the issue
         id: monthly
         if: steps.mode.outputs.mode == 'monthly'
-        run: python main.py publish
+        run: |
+          python main.py publish
+          python main.py quality-report
 
       - name: Republish — retry missing abstracts, rewrite last month's issue
         id: republish
@@ -95,6 +99,7 @@ jobs:
         run: |
           python main.py enrich --retry-all
           python main.py publish --rewrite
+          python main.py quality-report
 
       - name: Evaluate — second model re-labels a sample, agreement report
         id: evaluate
@@ -102,6 +107,23 @@ jobs:
         run: |
           python main.py agreement
           python main.py build
+
+      # The monthly LLM quality report (and any regression alert) is posted as a GitHub
+      # issue: GitHub emails it to the repository owner. One issue per month; a remade
+      # issue adds a comment to it.
+      - name: Post quality report
+        if: always() && hashFiles('quality-post.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="$(cat quality-post-title.txt)"
+          num=$(gh issue list --state all --limit 100 --json number,title \
+                --jq ".[] | select(.title == \"$title\") | .number" | head -n1)
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body-file quality-post.md
+          else
+            gh issue create --title "$title" --body-file quality-post.md
+          fi
 
       # Save whatever was fetched even if a later step failed, so no work is lost.
       - name: Commit database and site

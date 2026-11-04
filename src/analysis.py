@@ -18,7 +18,7 @@ from pathlib import Path
 
 import yaml
 
-from src import prompts
+from src import prompts, quality
 from src.fulltext import DATASET_HOSTS  # replication packages, not papers
 from src.llm import JSONModel, LLMAuthError, LLMError
 from src.storage import Storage
@@ -226,13 +226,34 @@ def analyse_paper(paper: dict, client: JSONModel, full_text=None) -> dict:
     basis = ({"basis": "full text", "full_text_url": full_text.url, "full_text_kind": full_text.kind,
               "full_text_chars": len(full_text.text)} if full_text else {"basis": "abstract"})
     last_error = None
+    result = None
     for _ in range(2):  # one retry if the model omits required fields
         try:
-            return {**_validate_analysis(client.generate_json(prompt, system=prompts.SYSTEM)), **basis}
+            result = _validate_analysis(client.generate_json(prompt, system=prompts.SYSTEM))
+            break
         except ValueError as exc:
             last_error = exc
             log.warning("Invalid analysis for '%s': %s", paper["title"][:60], exc)
-    raise LLMError(f"Could not get a valid analysis: {last_error}")
+    if result is None:
+        raise LLMError(f"Could not get a valid analysis: {last_error}")
+
+    # Number grounding: every number in the summary and takeaways must appear in
+    # the text the model was given. If not, ask once for a rewrite without it.
+    source = full_text.text if full_text else (paper.get("abstract") or "")
+    missing = quality.unverified_numbers(result, source)
+    if missing:
+        log.warning("'%s': numbers not in the source text %s; asking for a rewrite",
+                    paper["title"][:60], missing)
+        retry = prompt + prompts.number_feedback(missing)
+        try:
+            second = _validate_analysis(client.generate_json(retry, system=prompts.SYSTEM))
+            if len(quality.unverified_numbers(second, source)) < len(missing):
+                result = second
+        except (ValueError, LLMError) as exc:
+            log.warning("Rewrite failed for '%s': %s", paper["title"][:60], exc)
+        missing = quality.unverified_numbers(result, source)
+    claimed = quality.numbers_in(" ".join([result.get("summary", "")] + list(result.get("key_takeaways", []))))
+    return {**result, **basis, "numbers": {"checked": len(set(claimed)), "unverified": missing}}
 
 
 # --- Periods ------------------------------------------------------------------------

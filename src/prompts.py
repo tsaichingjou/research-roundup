@@ -153,3 +153,10 @@ Return one JSON object: {{"intro": "..."}} where intro is 2-3 sentences (max 70 
 naming the one or two themes that connect several of these papers and why they matter
 for markets now. Do not list every paper, do not add facts that are not in the
 summaries, and keep the measured house style."""
+
+
+def number_feedback(numbers: list[str]) -> str:
+    """Follow-up when a write-up quotes numbers that are not in the source text."""
+    return ("\n\nIMPORTANT: a previous answer quoted these numbers, which do not appear in the "
+            f"text above: {', '.join(numbers)}. Write the answer again, using only numbers that "
+            "appear in the text; where a figure is not stated, describe the finding without one.")

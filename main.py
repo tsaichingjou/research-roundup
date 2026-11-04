@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -32,12 +33,14 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from src.analysis import load_analysis_config, provisional_periods, run_analysis, run_screening  # noqa: E402
+from src.analysis import (load_analysis_config, month_of, previous_month, provisional_periods,  # noqa: E402
+                          run_analysis, run_screening)
 from src.enrich import run_enrichment  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
 from src.evaluation import (evaluate, export_sample, format_agreement, format_report,  # noqa: E402
                             model_agreement, write_disagreements)  # noqa: E402
 from src.issues import issue_needs_publishing, publish_issue  # noqa: E402
+from src import quality  # noqa: E402
 from src.llm import GeminiClient, LLMError  # noqa: E402
 from src.pipeline import check_sources, load_config, run_fetch  # noqa: E402
 from src.fulltext import FullTextFinder  # noqa: E402
@@ -50,6 +53,12 @@ def make_client(acfg: dict, stage: str) -> GeminiClient:
     return GeminiClient(models=llm[f"{stage}_models"], temperature=llm.get("temperature", 0.2),
                         min_interval_seconds=llm.get("min_interval_seconds", 4),
                         timeout=llm.get("timeout_seconds", 90))
+
+
+def _mention() -> str:
+    """@-mention the repository owner so GitHub emails them the posted report."""
+    owner = os.environ.get("GITHUB_REPOSITORY_OWNER")
+    return f"\n\ncc @{owner}" if owner else ""
 
 
 def make_finder(acfg: dict, settings: dict) -> FullTextFinder | None:
@@ -154,6 +163,12 @@ def main() -> int:
 
     sub.add_parser("catch-up", help="Daily safety net: (re)make last month's issue if the monthly run "
                                     "was missed, came early or used a fallback model")
+
+    p_rg = sub.add_parser("regression", help="Re-label the frozen benchmark with the current prompt and model")
+    p_rg.add_argument("--threshold", type=float, default=0.9)
+    p_qr = sub.add_parser("quality-report", help="Monthly LLM health report for last month's issue")
+    p_qr.add_argument("--month", help="Issue month YYYY-MM (default: the month that just ended)")
+    p_qr.add_argument("--force", action="store_true", help="Write it even if this version was already reported")
 
     p_ag = sub.add_parser("agreement", help="Re-label a sample with a second model and report agreement")
     p_ag.add_argument("--per-class", type=int, default=35)
@@ -286,6 +301,44 @@ def main() -> int:
         print("\nSaved to evaluation/report.txt")
         return 0
 
+    if args.command == "regression":
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        client = make_client(acfg, "screening")
+        try:
+            res = quality.regression_check(client, acfg, ROOT / "evaluation" / "benchmark.csv",
+                                           threshold=args.threshold)
+        except LLMError as exc:
+            print(f"ERROR: {exc}")
+            return 1
+        text = quality.format_regression(res)
+        print(text)
+        print_usage(client)
+        (ROOT / "evaluation" / "regression.md").write_text(text + "\n", encoding="utf-8")
+        if not res["ok"]:   # picked up by the workflow and posted as a GitHub issue
+            Path("quality-post-title.txt").write_text("LLM regression check failed", encoding="utf-8")
+            Path("quality-post.md").write_text(text + _mention(), encoding="utf-8")
+        return 0
+
+    if args.command == "quality-report":
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        month = args.month or previous_month(month_of(datetime.now(timezone.utc)))
+        if not storage.get_issue(month):
+            print(f"No {month} issue yet: no report.")
+            return 0
+        out = ROOT / "evaluation" / "quality" / f"{month}.md"
+        rep = quality.monthly_report(storage, acfg, month, site_url=site_cfg.get("site_url", ""),
+                                     regression_path=ROOT / "evaluation" / "regression.md")
+        marker = f"<!-- issue published_at: {rep['published_at']} -->"
+        if out.exists() and marker in out.read_text(encoding="utf-8") and not args.force:
+            print(f"The {month} report is up to date: nothing to post.")
+            return 0
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(marker + "\n" + rep["body"] + "\n", encoding="utf-8")
+        Path("quality-post-title.txt").write_text(rep["title"], encoding="utf-8")
+        Path("quality-post.md").write_text(rep["body"] + _mention(), encoding="utf-8")
+        print(rep["body"])
+        return 0
+
     if args.command == "agreement":
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
         llm = acfg["llm"]
@@ -308,6 +361,7 @@ def main() -> int:
         out = ROOT / "evaluation"
         (out / "report.txt").write_text(report + "\n", encoding="utf-8")
         n = write_disagreements(result, out / "disagreements.csv")
+        quality.write_benchmark(result["rows"], out / "agreement_sample.csv")
         print_usage(client)
         print(f"\nSaved evaluation/report.txt and {n} disagreements to evaluation/disagreements.csv")
         return 0

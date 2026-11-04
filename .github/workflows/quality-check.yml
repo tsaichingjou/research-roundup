@@ -1,0 +1,53 @@
+# LLM quality, layer 1: regression check when the system changes.
+#
+# Whenever the prompts or the model configuration change, the frozen benchmark
+# (evaluation/benchmark.csv, 105 papers with the label two independent models
+# agreed on) is re-labelled with the new setup. If agreement falls below 90%, a
+# GitHub issue is opened, which GitHub emails to the repository owner.
+name: LLM regression check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/prompts.py
+      - config/analysis.yaml
+      - evaluation/benchmark.csv
+  workflow_dispatch:
+
+concurrency:
+  group: research-roundup-pipeline     # shares the queue with the pipeline (both commit)
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      issues: write
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Re-label the benchmark with the current prompt and model
+        run: python main.py regression
+
+      - name: Open an issue if quality dropped
+        if: hashFiles('quality-post.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "$(cat quality-post-title.txt) ($(date -u +%Y-%m-%d))" --body-file quality-post.md
+
+      - name: Save the result
+        run: |
+          git config user.name "research-roundup-bot"
+          git config user.email "research-roundup-bot@users.noreply.github.com"
+          git add -f evaluation/regression.md
+          git diff --cached --quiet || { git commit -m "LLM regression check $(date -u +%Y-%m-%d)"; git pull --rebase; git push; }
