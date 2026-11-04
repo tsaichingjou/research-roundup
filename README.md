@@ -77,6 +77,10 @@ remakes an issue that GitHub delayed or skipped.
 - **Classification checked, not assumed**: two independent models agree on
   96% of a stratified sample of 105 papers (Cohen's κ 0.94, EM 35/35); the
   disagreements are listed for human review ([details](TECHNICAL.md#evaluating-the-classification)).
+- **Alerts only when a person is needed**: a daily health check opens a GitHub
+  issue (emailed to the owner) if the API key fails, papers stay unscored for
+  two days, a source fails three runs in a row, or an issue is still not right
+  after the catch-up; it closes the issue itself once the problem is gone.
 - **LLM quality kept up over time, automatically**: a frozen benchmark is
   re-run whenever the prompt or the models change, every number in a write-up
   is checked against the paper's text, and each issue gets a health report in
