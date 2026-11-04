@@ -1,7 +1,7 @@
 EM / DM / Transversal classification: agreement between two independent models
 
 Model A (screening, labels stored when each paper was scored): gemini-3.5-flash-lite
-Model B (stronger model, re-labelled now with the same prompt and inputs; papers per model): gemini-3.1-flash-lite (105)
+Model B (a different model, re-labelled now with the same prompt and inputs; papers per model): gemini-3.1-flash-lite (105)
 Sample: 105 of 105 papers drawn, stratified by model A's label (up to 35 per class)
 
 This measures agreement, not accuracy: two models can make the same mistake.

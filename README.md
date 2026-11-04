@@ -353,12 +353,20 @@ The EM / DM / Transversal labels are not taken on trust (`src/evaluation.py`).
 **Two-model agreement (the reported check).** `python main.py agreement` takes
 a sample of scored papers, stratified by the screening model's label (about 35
 per class, so EM is not crowded out by the much larger DM group), and has a
-second, stronger model label them again, independently, from the same prompt
-and inputs. `evaluation/report.txt` gives the agreement rate with a 95%
+second, different model label them again, independently, from the same prompt
+and inputs (the stronger write-up model when its small free-tier quota allows,
+otherwise another lite model; the report names it). `evaluation/report.txt` gives the agreement rate with a 95%
 interval, Cohen's κ, agreement per class, the same rate re-weighted to the
 class mix of all screened papers, the confusion matrix, and how far apart the
 two models' relevance scores are. Run it from the Actions tab (mode
 *evaluate*); results are committed to `evaluation/`.
+
+**Result (4 Nov 2026, 105 papers, gemini-3.5-flash-lite vs gemini-3.1-flash-lite):**
+96.2% agreement (95% CI 91-99%), Cohen's κ 0.94; 93.8% re-weighted to the full
+class mix. EM agreed on all 35 papers; the 4 disagreements are all DM vs
+Transversal (e.g. a US-tariff trade-diversion paper about the EU), the boundary
+that the definitions leave most open to judgement. Relevance scores were within
+one point for 87% of papers.
 
 Agreement is not accuracy: two models can make the same mistake, and models
 from one family may share a bias. What it does show is how stable the labels

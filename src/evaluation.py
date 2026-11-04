@@ -299,7 +299,7 @@ def format_agreement(result: dict) -> str:
         "EM / DM / Transversal classification: agreement between two independent models",
         "",
         f"Model A (screening, labels stored when each paper was scored): {a}",
-        f"Model B (stronger model, re-labelled now with the same prompt and inputs; papers per model): {result['model_b']}",
+        f"Model B (a different model, re-labelled now with the same prompt and inputs; papers per model): {result['model_b']}",
         f"Sample: {result['n']} of {result['n_sample']} papers drawn, stratified by model A's label "
         f"(up to {max(Counter(r['label_a'] for r in result['rows']).values())} per class)",
         "",
