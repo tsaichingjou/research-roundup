@@ -208,6 +208,40 @@ python -m pytest -q                  # run tests (no network or API key needed)
 | G10 central banks | ECB, Bank of Japan, Bank of England, Bank of Canada, Bundesbank, Banque de France, Banca d'Italia, De Nederlandsche Bank, National Bank of Belgium, Riksbank, SNB (Fed via Fed in Print) | OpenAlex API, one query per bank; BIS Central Bank Research Hub RSS as a supplement |
 | European national central banks | 25 banks, from Banco de España to Norges Bank and the NBP | Same |
 
+**Fallback strategies by source.** The brief allows a source to be removed for
+a cycle when abstracts are unavailable, provided the fallbacks are documented.
+Rather than drop a whole source, the agent handles each paper whose feed gives
+no abstract in turn: it looks the abstract up in OpenAlex, then on the
+publisher's page, then reads the opening of the paper's own text (the abstract
+section of a PDF, or the first paragraphs of a speech or short article). A paper
+for which all three fail is, in effect, removed from that cycle: it is labelled
+by market focus from its title so it still shows in the coverage figures, but it
+is not scored and cannot be selected. The sources that needed a fallback, for
+all papers collected up to 4 November 2026 (`python main.py fallbacks` prints
+the current table; each newsletter carries the table for its own month):
+
+| Source | Papers | OpenAlex | Publisher page | Paper's own text | Title only |
+|---|---:|---:|---:|---:|---:|
+| Journal of Political Economy | 22 | 5 | – | – | 17 |
+| Federal Reserve Bank of St. Louis | 26 | – | – | 13 | 7 |
+| Bank for International Settlements (BIS) | 26 | 2 | – | 7 | – |
+| Federal Reserve Bank of Dallas | 27 | – | – | 1 | 7 |
+| Board of Governors of the Federal Reserve System | 28 | – | – | 6 | – |
+| Federal Reserve Bank of Minneapolis | 24 | 1 | – | – | 4 |
+| Federal Reserve Bank of New York | 25 | 2 | – | 1 | 2 |
+| Federal Reserve Bank of Boston | 25 | – | – | 2 | – |
+| Federal Reserve Bank of Kansas City | 25 | 1 | – | 1 | – |
+| Federal Reserve Bank of Philadelphia | 26 | – | – | 2 | – |
+| Deutsche Bundesbank | 23 | – | – | 1 | – |
+| European Central Bank | 21 | – | – | 1 | – |
+| European Systemic Risk Board | 1 | – | – | 1 | – |
+| Federal Reserve Bank of Cleveland | 28 | – | – | 1 | – |
+| Other central bank (doi.org) | 1 | 1 | – | – | – |
+
+Most fallbacks concern Fed speeches and blog posts and BIS papers, whose feeds
+carry no abstract but whose text is open; the only source largely removed is
+JPE (below). The other 40 sources needed no fallback.
+
 **Why BPEA shows no papers.** BPEA publishes two editions a year and offers
 no feed, and Crossref returns none of its recent papers. The OpenAlex query
 (both ISSNs, with a fallback by journal name, over a full year) runs in every

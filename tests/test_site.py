@@ -40,7 +40,7 @@ def test_site_files_and_newsletter_content(built):
     assert (out / "index.html").exists() and (out / ".nojekyll").exists()
     for e in report["entries"]:
         assert e["analysis"]["summary"] in newsletter
-    assert "1 publication with no abstract anywhere was labelled by market focus from its title only" in newsletter
+    assert "Sources that needed a fallback" in newsletter and "Title only" in newsletter
     assert "&lt;/script&gt;" in newsletter                       # titles are escaped
     assert 'href="https://example.org/rr/"' in newsletter        # absolute link for email
 

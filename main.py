@@ -170,6 +170,8 @@ def main() -> int:
     p_qr.add_argument("--month", help="Issue month YYYY-MM (default: the month that just ended)")
     p_qr.add_argument("--force", action="store_true", help="Write it even if this version was already reported")
 
+    sub.add_parser("fallbacks", help="Print the per-source fallback table (Markdown) for every paper so far")
+
     p_ag = sub.add_parser("agreement", help="Re-label a sample with a second model and report agreement")
     p_ag.add_argument("--per-class", type=int, default=35)
 
@@ -299,6 +301,12 @@ def main() -> int:
         print(report)
         (ROOT / "evaluation" / "report.txt").write_text(report + "\n", encoding="utf-8")
         print("\nSaved to evaluation/report.txt")
+        return 0
+
+    if args.command == "fallbacks":
+        from src.site import collect, fallback_markdown, fallback_table
+        data = collect(storage, config)
+        print(fallback_markdown(fallback_table(data["papers"], data["sources"])))
         return 0
 
     if args.command == "regression":

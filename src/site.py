@@ -99,6 +99,39 @@ def collect(storage: Storage, sources_cfg: dict) -> dict:
     }
 
 
+FALLBACK_COLUMNS = [("OpenAlex", "OpenAlex"), ("publisher page", "Publisher page"),
+                    ("opening of the text", "Paper's own text"), ("title only", "Title only")]
+
+
+def fallback_table(papers: list[dict], sources: dict) -> list[dict]:
+    """Per source, how many papers needed a fallback because the feed had no
+    abstract: recovered from OpenAlex, the publisher's page or the paper's own
+    text, or left with the title only (labelled, not scored, not selectable).
+    Only sources that needed one are listed, most affected first."""
+    rows = {}
+    for p in papers:
+        if p.get("status") == "excluded" and p.get("reason") != "no abstract available":
+            continue                                    # not research: not counted
+        r = rows.setdefault(p["source"], {"source": sources.get(p["source"], {}).get("name", p["source"]),
+                                          "total": 0, **{k: 0 for k, _ in FALLBACK_COLUMNS}})
+        r["total"] += 1
+        if p.get("abstract_source") in r:
+            r[p["abstract_source"]] += 1
+        if p.get("status") in ("title_only", "excluded"):
+            r["title only"] += 1
+    out = [r for r in rows.values() if any(r[k] for k, _ in FALLBACK_COLUMNS)]
+    return sorted(out, key=lambda r: (-sum(r[k] for k, _ in FALLBACK_COLUMNS), r["source"]))
+
+
+def fallback_markdown(rows: list[dict]) -> str:
+    head = "| Source | Papers | " + " | ".join(name for _, name in FALLBACK_COLUMNS) + " |"
+    lines = [head, "|---|---:|" + "---:|" * len(FALLBACK_COLUMNS)]
+    for r in rows:
+        lines.append(f"| {r['source']} | {r['total']} | "
+                     + " | ".join(str(r[k] or "–") for k, _ in FALLBACK_COLUMNS) + " |")
+    return "\n".join(lines)
+
+
 def issue_context(data: dict, issue: dict, site: dict) -> dict:
     by_uid = {p["uid"]: p for p in data["papers"]}
     entries = [by_uid[u] for u in issue["paper_uids"] if u in by_uid and by_uid[u]["analysis"]]
@@ -111,6 +144,12 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
                 excluded.append({"source": data["sources"].get(src, {}).get("name", src),
                                  "reason": k.removeprefix("excluded: "), "n": v})
     recovered = sum(c.get("abstract recovered", 0) for c in cov.values())
+    pool = set(issue["stats"].get("pool_uids") or [])
+    if not pool:   # issues made before calendar-month windows: fall back to dates
+        st = issue["stats"]
+        pool = {p["uid"] for p in data["papers"]
+                if st["window_start"][:10] <= (p["published"] or p["fetched_at"])[:10] < st["window_end"][:10]}
+    fallbacks = fallback_table([p for p in data["papers"] if p["uid"] in pool], data["sources"])
     title_only = sorted(((c.get("classified from title", 0), data["sources"].get(src, {}).get("name", src))
                          for src, c in cov.items() if c.get("classified from title")), reverse=True)
     return {
@@ -126,6 +165,7 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
         "window": f"{_date(issue['stats']['window_start'])} to {_last_day(issue['stats']['window_end'])}",
         "n_late": len(issue["stats"].get("late_uids") or []),
         "fmt_date": _date,
+        "fallbacks": fallbacks, "fallback_columns": FALLBACK_COLUMNS,
     }
 
 

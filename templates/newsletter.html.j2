@@ -125,10 +125,28 @@
   <tr><td class="px" bgcolor="{{ mist }}" style="padding:26px 40px 30px 40px; background:{{ mist }}; font-family:{{ sans }}; font-size:13px; line-height:1.6; color:{{ muted }};">
     <p style="margin:0 0 8px 0; font-size:14px; font-weight:bold; color:{{ ink }};">How this issue was made</p>
     <p style="margin:0 0 10px 0;">An automated agent screened {{ issue.stats.n_candidates }} publications from {{ n_sources }} sources: everything published {{ window }}{% if n_late %}, plus {{ n_late }} from the previous month that appeared only after its issue went out{% endif %}. {{ issue.stats.n_scored }} with a usable abstract were scored for market relevance by a language model, and the {{ entries|length }} above were selected, with at most two papers per source.</p>
-    {% if recovered %}
+    {% if recovered and not fallbacks %}
     <p style="margin:0 0 10px 0;">For {{ recovered }} papers whose feed carried no abstract, a stand-in was recovered before screening: from OpenAlex, the publisher's page, or the opening of the paper's own text.</p>
     {% endif %}
-    {% if n_title_only %}
+    {% if fallbacks %}
+    <p style="margin:0 0 6px 0;">Sources that needed a fallback because their feed gave no abstract, and how each paper was handled:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse; margin:0 0 12px 0; font-size:12px; line-height:1.4; color:{{ ink }};">
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #c9d1da; font-weight:bold;">Source</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #c9d1da; font-weight:bold;">Papers</td>
+        {% for key, name in fallback_columns %}<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #c9d1da; font-weight:bold;">{{ name }}</td>{% endfor %}
+      </tr>
+      {% for r in fallbacks %}
+      <tr>
+        <td style="padding:4px 6px 4px 0; border-bottom:1px solid #e1e6ec;">{{ r.source }}</td>
+        <td align="right" style="padding:4px 6px; border-bottom:1px solid #e1e6ec;">{{ r.total }}</td>
+        {% for key, name in fallback_columns %}<td align="right" style="padding:4px 0 4px 6px; border-bottom:1px solid #e1e6ec;">{{ r[key] or "–" }}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+    <p style="margin:0 0 10px 0;">OpenAlex, publisher page and paper's own text: an abstract (or, for speeches and short articles, the opening paragraphs) was recovered and the paper was scored as usual. Title only: nothing was found anywhere (JPE publishes no open abstracts), so the paper was labelled by market focus from its title, not scored, and left out of the selection for this issue.</p>
+    {% endif %}
+    {% if n_title_only and not fallbacks %}
     <p style="margin:0 0 10px 0;">{{ n_title_only }} publication{{ " with no abstract anywhere was" if n_title_only == 1 else "s with no abstract anywhere were" }} labelled by market focus from {{ "its title" if n_title_only == 1 else "their titles" }} only{% if title_only_sources %} ({{ title_only_sources }}){% endif %}. A title is too little to rank on, so {{ "it was" if n_title_only == 1 else "they were" }} not eligible for this issue.</p>
     {% endif %}
     {% if excluded %}
