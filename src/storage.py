@@ -225,6 +225,17 @@ class Storage:
             rows = conn.execute("SELECT * FROM issues ORDER BY id DESC").fetchall()
         return [_issue_dict(r) for r in rows]
 
+    def recent_fetches(self, n: int) -> dict[str, list[dict]]:
+        """The last `n` fetch_log rows of each source, newest first."""
+        out: dict[str, list[dict]] = {}
+        with self._conn() as conn:
+            for row in conn.execute("SELECT source_id, run_at, status, message FROM fetch_log "
+                                    "ORDER BY run_at DESC, id DESC"):
+                runs = out.setdefault(row[0], [])
+                if len(runs) < n:
+                    runs.append({"run_at": row[1], "status": row[2], "message": row[3] or ""})
+        return out
+
     def get_issue(self, issue_id: str) -> dict | None:
         with self._conn() as conn:
             row = conn.execute("SELECT * FROM issues WHERE id = ?", (issue_id,)).fetchone()

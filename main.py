@@ -40,8 +40,8 @@ from src.env import load_dotenv  # noqa: E402
 from src.evaluation import (evaluate, export_sample, format_agreement, format_report,  # noqa: E402
                             model_agreement, write_disagreements)  # noqa: E402
 from src.issues import issue_needs_publishing, publish_issue  # noqa: E402
-from src import quality  # noqa: E402
-from src.llm import GeminiClient, LLMError  # noqa: E402
+from src import health, quality  # noqa: E402
+from src.llm import GeminiClient, LLMAuthError, LLMError  # noqa: E402
 from src.pipeline import check_sources, load_config, run_fetch  # noqa: E402
 from src.fulltext import FullTextFinder  # noqa: E402
 from src.site import build_site  # noqa: E402
@@ -170,6 +170,7 @@ def main() -> int:
     p_qr.add_argument("--month", help="Issue month YYYY-MM (default: the month that just ended)")
     p_qr.add_argument("--force", action="store_true", help="Write it even if this version was already reported")
 
+    sub.add_parser("health", help="Daily health check: write current alerts to health-alerts.json")
     sub.add_parser("fallbacks", help="Print the per-source fallback table (Markdown) for every paper so far")
 
     p_ag = sub.add_parser("agreement", help="Re-label a sample with a second model and report agreement")
@@ -303,6 +304,14 @@ def main() -> int:
         print("\nSaved to evaluation/report.txt")
         return 0
 
+    if args.command == "health":
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        alerts = health.check(storage, acfg)
+        Path("health-alerts.json").write_text(json.dumps(alerts, indent=2), encoding="utf-8")
+        print("Health: " + ("no problems found." if not alerts else
+                            "; ".join(a["title"].removeprefix("Agent health: ") for a in alerts)))
+        return 0
+
     if args.command == "fallbacks":
         from src.site import collect, fallback_markdown, fallback_table
         data = collect(storage, config)
@@ -381,6 +390,8 @@ def main() -> int:
             r = run_screening(storage, screener, acfg)
         except LLMError as exc:
             print(f"ERROR: {exc}")
+            if isinstance(exc, LLMAuthError):
+                health.AUTH_MARKER.write_text(str(exc), encoding="utf-8")
             return 1
         print_usage(screener)
         print(f"\nScreening: {r['new']} new papers, {r['scored']} scored, {r['excluded']} excluded"

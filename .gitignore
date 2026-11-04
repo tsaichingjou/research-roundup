@@ -9,3 +9,6 @@ site/
 output/*.json
 quality-post.md
 quality-post-title.txt
+health-alerts.json
+alert.md
+llm-auth-failed.txt

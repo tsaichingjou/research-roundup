@@ -108,6 +108,34 @@ jobs:
           python main.py agreement
           python main.py build
 
+      # Daily health check: problems that need a person (API key rejected, papers
+      # unscored for 2+ days, a source failing 3 runs in a row, last month's issue
+      # still not right after the catch-up window). One issue per problem, emailed
+      # by GitHub; not repeated while open; closed automatically once resolved.
+      - name: Health check
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python main.py health || exit 0
+          [ -f health-alerts.json ] || exit 0
+          open=$(gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
+                 --jq '[.[] | select(.title | startswith("Agent health:")) | {number, title}]')
+          jq -c '.[]' health-alerts.json | while read -r alert; do
+            title=$(jq -r .title <<<"$alert")
+            if ! jq -e --arg t "$title" 'any(.[]; .title == $t)' <<<"$open" >/dev/null; then
+              { jq -r .body <<<"$alert"; printf '\n\ncc @%s\n' "$GITHUB_REPOSITORY_OWNER"; } > alert.md
+              gh issue create --title "$title" --body-file alert.md
+            fi
+          done
+          jq -c '.[]' <<<"$open" | while read -r issue; do
+            title=$(jq -r .title <<<"$issue")
+            if ! jq -e --arg t "$title" 'any(.[]; .title == $t)' health-alerts.json >/dev/null; then
+              gh issue close "$(jq -r .number <<<"$issue")" \
+                --comment "Resolved: the latest run no longer finds this problem."
+            fi
+          done
+
       # The monthly LLM quality report (and any regression alert) is posted as a GitHub
       # issue: GitHub emails it to the repository owner. One issue per month; a remade
       # issue adds a comment to it.

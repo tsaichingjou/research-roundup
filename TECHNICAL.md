@@ -532,6 +532,23 @@ once to rewrite without it; numbers still unverified are stored with the
 write-up and listed in the monthly report. This runs as part of each write-up,
 at the cost of one extra call only when a number fails.
 
+**Daily health check.** The quality layers watch the LLM's output; a separate
+check (`src/health.py`) watches the agent itself, for problems that do not
+crash a run but need a person. It runs at the end of every daily and monthly run
+and alerts only when the agent's own retries have run out:
+
+| Alert | When |
+|---|---|
+| Gemini API key rejected | the last run could not authenticate (nothing can be scored) |
+| Papers waiting to be scored | papers collected more than 2 days ago still have no score (Gemini down or out of quota for days) |
+| Sources failing repeatedly | a source failed on each of its last 3 fetches (feed moved or address changed) |
+| Last month's issue needs attention | after the catch-up window (the 5th to the 8th), the issue is still missing or still has fallback-model write-ups |
+
+Each alert opens one GitHub issue titled "Agent health: …", which GitHub emails
+to the repository owner. It is not repeated while it stays open, and the
+workflow closes it with a comment once a run no longer finds the problem. A run
+that crashes outright is reported by GitHub's own failed-workflow email.
+
 ## What's built
 
 - ✅ Ingestion of every source in the brief: RSS, Crossref and OpenAlex, with abstract recovery
