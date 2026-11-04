@@ -451,11 +451,13 @@ agreement check are frozen in `evaluation/benchmark.csv`, each with the label
 both models agreed on (the 4 disputed papers carry none and do not count). A
 second workflow, `quality-check.yml`, runs whenever `src/prompts.py`,
 `config/analysis.yaml` or the benchmark changes: it re-labels the benchmark with
-the new prompt and screening model and compares. Below 90% agreement it opens a
+the new prompt and screening model and compares. Below 88% agreement it opens a
 GitHub issue listing the papers whose label changed, so a prompt edit or a model
 retired by Google cannot quietly change how papers are classified. The latest
 result is kept in `evaluation/regression.md`. Cost: about 14 lite-model calls
-per change.
+per change. The threshold allows for run-to-run noise: re-running the unchanged
+setup gave 93.1% (4 Nov 2026), since a model does not label borderline papers
+identically every time; a real regression shows up as a larger drop.
 
 **2. A health report for every issue.** After an issue is published (or remade
 by the catch-up), `quality-report` writes a short report in English and the

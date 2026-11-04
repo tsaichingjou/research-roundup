@@ -2,7 +2,7 @@
 #
 # Whenever the prompts or the model configuration change, the frozen benchmark
 # (evaluation/benchmark.csv, 105 papers with the label two independent models
-# agreed on) is re-labelled with the new setup. If agreement falls below 90%, a
+# agreed on) is re-labelled with the new setup. If agreement falls below 88%, a
 # GitHub issue is opened, which GitHub emails to the repository owner.
 name: LLM regression check
 

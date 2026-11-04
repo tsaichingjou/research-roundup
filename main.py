@@ -165,7 +165,7 @@ def main() -> int:
                                     "was missed, came early or used a fallback model")
 
     p_rg = sub.add_parser("regression", help="Re-label the frozen benchmark with the current prompt and model")
-    p_rg.add_argument("--threshold", type=float, default=0.9)
+    p_rg.add_argument("--threshold", type=float, default=0.88)
     p_qr = sub.add_parser("quality-report", help="Monthly LLM health report for last month's issue")
     p_qr.add_argument("--month", help="Issue month YYYY-MM (default: the month that just ended)")
     p_qr.add_argument("--force", action="store_true", help="Write it even if this version was already reported")

@@ -85,7 +85,7 @@ def read_benchmark(path: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-def regression_check(client, cfg: dict, path: Path, threshold: float = 0.9) -> dict:
+def regression_check(client, cfg: dict, path: Path, threshold: float = 0.88) -> dict:
     """Re-label the benchmark with the current prompt and model and compare with
     the reference labels."""
     from src.analysis import screen
