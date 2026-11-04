@@ -12,6 +12,32 @@ The agent runs itself on GitHub Actions: every day it fetches and scores new
 publications, and on the 5th of each month it closes the month that just ended,
 selects 5–8 papers, writes them up and publishes the issue to GitHub Pages.
 
+## Highlights
+
+- **Every source in the brief, 58 in all**: the five top journals, NBER, BPEA,
+  the IMF and the BIS, the Federal Reserve Board and the 12 regional Feds, the
+  G10 central banks and the ECB, and 25 European national central banks, read
+  through RSS feeds and the Crossref and OpenAlex APIs rather than scraping.
+- **Runs itself**: GitHub Actions fetches and scores new papers every day and
+  publishes the issue on the 5th, with a catch-up that remakes an issue missed
+  or delayed by GitHub, or written while the preferred model was overloaded.
+- **A calendar month per issue, nothing lost**: the October issue covers
+  1–31 October and closes on 5 November, so papers indexed a few days late make
+  their own month; anything later joins the next issue as a late arrival.
+- **Write-ups from the full text**: the selected papers are written up from
+  their open PDF or web page where one exists, so the key takeaways quote actual
+  estimates; papers without an abstract are looked up in three places before
+  being labelled from their title only and kept out of the selection.
+- **Classification checked, not assumed**: two independent models agree on
+  96% of a stratified sample of 105 papers (Cohen's κ 0.94, EM 35/35); the
+  disagreements are listed for human review (see *Evaluating the classification*).
+- **Honest about gaps**: JPE is only partly covered (no open abstracts) and BPEA
+  has returned no papers so far; both are documented below, as are the limits
+  of the agreement check.
+- **A dashboard for readers without context**: the newsletter, every paper
+  of each period with filters, source coverage by market focus, and a "How it
+  works" page explaining the scores, labels and rules.
+
 ## Architecture
 
 ```
