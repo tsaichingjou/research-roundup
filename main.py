@@ -37,7 +37,7 @@ from src.enrich import run_enrichment  # noqa: E402
 from src.env import load_dotenv  # noqa: E402
 from src.evaluation import (evaluate, export_sample, format_agreement, format_report,  # noqa: E402
                             model_agreement, write_disagreements)  # noqa: E402
-from src.issues import publish_issue  # noqa: E402
+from src.issues import issue_needs_publishing, publish_issue  # noqa: E402
 from src.llm import GeminiClient, LLMError  # noqa: E402
 from src.pipeline import check_sources, load_config, run_fetch  # noqa: E402
 from src.fulltext import FullTextFinder  # noqa: E402
@@ -152,6 +152,9 @@ def main() -> int:
     p_ev.add_argument("--rerun", action="store_true",
                       help="Re-classify the labelled papers now with the current prompt")
 
+    sub.add_parser("catch-up", help="Daily safety net: (re)make last month's issue if the monthly run "
+                                    "was missed, came early or used a fallback model")
+
     p_ag = sub.add_parser("agreement", help="Re-label a sample with a second model and report agreement")
     p_ag.add_argument("--per-class", type=int, default=35)
 
@@ -228,6 +231,15 @@ def main() -> int:
 
     if args.command == "build":
         return build()
+
+    if args.command == "catch-up":
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        need = issue_needs_publishing(storage, acfg)
+        if not need:
+            print("Catch-up: last month's issue is in order, nothing to do.")
+            return 0
+        print(f"Catch-up: the {need[0]} issue needs (re)publishing: {need[1]}.")
+        args.command, args.month, args.rewrite = "publish", need[0], False
 
     if args.command == "publish":
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")

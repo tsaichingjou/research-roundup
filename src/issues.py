@@ -81,3 +81,33 @@ def publish_issue(storage: Storage, report: dict, client: JSONModel | None = Non
     }
     storage.save_issue(issue)
     return issue
+
+
+def issue_needs_publishing(storage: Storage, cfg: dict, now: datetime | None = None,
+                           grace_days: int = 3) -> tuple[str, str] | None:
+    """Safety net for the monthly run, checked by every daily run.
+
+    GitHub may delay a scheduled run by hours or skip it under load, and on the
+    publish day the stronger model may be overloaded. From the publish day and
+    for `grace_days` after it, last month's issue is (re)made if it is missing,
+    was made before the publish day (so papers indexed late are not yet in it),
+    or has write-ups by a fallback model. Returns (month, reason) or None."""
+    from src.analysis import month_of, previous_month, publish_day
+
+    now = now or datetime.now(timezone.utc)
+    day = publish_day(cfg)
+    if not day <= now.day <= day + grace_days:
+        return None
+    month = previous_month(month_of(now))
+    issue = storage.get_issue(month)
+    if issue is None:
+        return month, "not published yet"
+    due = datetime.fromisoformat(month_of(now) + f"-{day:02d}T00:00:00+00:00")
+    if datetime.fromisoformat(issue["published_at"]) < due:
+        return month, "made before the publish day"
+    preferred = cfg["llm"]["analysis_models"][0]
+    fallback = [u for u in issue["paper_uids"]
+                if (storage.get_analysis(u) or {}).get("model") not in (None, preferred)]
+    if fallback:
+        return month, f"{len(fallback)} write-ups by a fallback model"
+    return None

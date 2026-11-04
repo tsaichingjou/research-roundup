@@ -63,7 +63,7 @@ suite without network access or API keys.
 
 | When | Job | Steps |
 |---|---|---|
-| Every day, 05:23 UTC | Daily screening | `fetch` (with abstract recovery) → `screen` → `build` (refreshes the month in progress and its provisional picks) |
+| Every day, 05:23 UTC | Daily screening | `fetch` (with abstract recovery) → `screen` → `catch-up` → `build` (refreshes the month in progress and its provisional picks) |
 | 5th of the month, 10:17 UTC (after the Gemini daily quota resets) | Monthly issue | `fetch` → `publish` (select from the month that just ended, write up, freeze the issue, build) |
 | On demand | Daily, monthly or republish | "Run workflow" button in the Actions tab; *republish* retries every missing abstract and rewrites last month's issue (`enrich --retry-all` → `publish --rewrite`), e.g. after a prompt change |
 
@@ -90,6 +90,14 @@ nothing is lost. Re-running an issue later (`publish --rewrite`, or
 shows the month with a provisional selection, the papers that would be chosen
 if the issue were made that day: the month in progress, and from the 1st to the
 5th also the month that is closing.
+
+**Safety net for the monthly run.** GitHub runs scheduled workflows late when
+its servers are busy (a run set for 05:23 has started at 13:07) and may skip
+one, and on the publish day Gemini's larger models can be overloaded. So every
+daily run also calls `catch-up`: from the 5th to the 8th it (re)makes last
+month's issue if it is missing, was made before the 5th, or contains write-ups
+by a fallback model. The issue is therefore complete within a few days without
+anyone pressing a button.
 
 A write-up produced by a fallback model (when the preferred model was
 overloaded or out of daily quota) is retried with the preferred model the next

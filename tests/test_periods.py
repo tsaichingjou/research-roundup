@@ -85,3 +85,28 @@ def test_write_up_by_fallback_model_is_retried_with_preferred(tmp_path):
     w = Writer("strong")
     analysis.run_analysis(s, FakeClient(), CFG, now=d("2026-11-05"), analysis_client=w)
     assert s.get_analysis(uid)["model"] == "strong" and any(p.startswith("Write") or "Title:" in p for p in w.prompts)
+
+
+def test_catch_up_remakes_missing_early_or_fallback_issues(tmp_path):
+    from src.issues import issue_needs_publishing, publish_issue
+    cfg = {**CFG, "schedule": {"publish_day": 5}, "llm": {"analysis_models": ["strong", "lite"]}}
+    s = store_with(tmp_path, [("a", "Oct [DM] score=8", "2026-10-05")])
+    assert issue_needs_publishing(s, cfg, now=d("2026-11-03")) is None          # before the 5th
+    assert issue_needs_publishing(s, cfg, now=d("2026-11-06")) == ("2026-10", "not published yet")
+    assert issue_needs_publishing(s, cfg, now=d("2026-11-10")) is None          # grace period over
+
+    class Writer(FakeClient):
+        def __init__(self, model):
+            super().__init__()
+            self.model = model
+    early = analysis.run_analysis(s, FakeClient(), cfg, now=d("2026-11-03"), analysis_client=Writer("strong"))
+    publish_issue(s, early)
+    with s._conn() as c:                                                       # made on 3 Nov
+        c.execute("UPDATE issues SET published_at='2026-11-03T12:00:00+00:00'")
+    assert issue_needs_publishing(s, cfg, now=d("2026-11-05"))[1] == "made before the publish day"
+    with s._conn() as c:
+        c.execute("UPDATE issues SET published_at='2026-11-05T12:00:00+00:00'")
+    assert issue_needs_publishing(s, cfg, now=d("2026-11-06")) is None
+    with s._conn() as c:
+        c.execute("UPDATE analysis SET model='lite'")
+    assert "fallback" in issue_needs_publishing(s, cfg, now=d("2026-11-06"))[1]

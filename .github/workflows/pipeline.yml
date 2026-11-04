@@ -79,6 +79,9 @@ jobs:
         if: steps.mode.outputs.mode == 'daily'
         run: |
           python main.py screen
+          # Safety net for the monthly run (delayed or skipped by GitHub, or written by a
+          # fallback model): from the 5th to the 8th, (re)make last month's issue if needed.
+          python main.py catch-up || echo "::warning::Catch-up failed; it is retried tomorrow."
           python main.py build
 
       - name: Monthly — select, write up and publish the issue
