@@ -208,6 +208,14 @@ def build_site(storage: Storage, sources_cfg: dict, site_cfg: dict,
     data = collect(storage, sources_cfg)
     data["selection"] = selection
     add_periods(data, in_progress)
+    # Write-ups drafted ahead of the publish day: shown on the provisional picks.
+    pending = {u for x in data["periods"] if x["status"] == "in_progress" for u in x["paper_uids"]}
+    for p in data["papers"]:
+        if p["uid"] in pending and not p["analysis"]:
+            a = storage.get_analysis(p["uid"])
+            if a:
+                p["analysis"], p["draft"] = a, True
+                p["focus"] = a.get("market_focus") or p["focus"]
 
     for issue in data["issues"]:
         html = env.get_template("newsletter.html.j2").render(**issue_context(data, issue, site_cfg))

@@ -2,7 +2,8 @@
 #
 #   Daily   (05:23 UTC):           fetch new papers, recover abstracts, score them, refresh
 #                                  the dashboard (incl. the provisional picks of the month in progress)
-#   Monthly (5th, 10:17 UTC):      fetch, select 5-8 papers from the month that just ended,
+#   Day before (4th): the daily runs also draft the write-ups of last month's provisional picks
+#   Monthly (5th, 00:17 UTC):      fetch, select 5-8 papers from the month that just ended,
 #                                  write them up, publish the issue
 #
 # Each run commits its database (data/published.db) and the built site (docs/)
@@ -17,8 +18,10 @@ on:
     - cron: "47 17 * * *"    # second daily run, as a backup: GitHub has started scheduled runs
                              # 7-8 hours late and may skip one; reruns are safe (nothing is
                              # fetched, scored or published twice)
-    - cron: "17 10 5 * *"    # monthly issue (5th: lets late-indexed papers into their month;
-                             # 10:17 UTC: after the Gemini free-tier daily quota resets at 08:00 UTC)
+    - cron: "17 0 5 * *"     # monthly issue (5th: lets late-indexed papers into their month).
+                             # Early because GitHub starts scheduled runs 7-8 hours late, so the
+                             # issue is ready on the morning of the 5th; the write-ups were
+                             # drafted on the 4th, so few calls to the stronger model are left.
   workflow_dispatch:
     inputs:
       mode:
@@ -68,7 +71,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "17 10 5 * *" ]; then
+          elif [ "${{ github.event.schedule }}" = "17 0 5 * *" ]; then
             echo "mode=monthly" >> "$GITHUB_OUTPUT"
           else
             echo "mode=daily" >> "$GITHUB_OUTPUT"
@@ -86,6 +89,8 @@ jobs:
           # Safety net for the monthly run (delayed or skipped by GitHub, or written by a
           # fallback model): from the 5th to the 8th, (re)make last month's issue if needed.
           python main.py catch-up || echo "::warning::Catch-up failed; it is retried tomorrow."
+          # The day before the publish day: draft the write-ups of last month's picks.
+          python main.py draft || echo "::warning::Drafting failed; the issue run writes them instead."
           python main.py quality-report      # only writes when the issue was (re)made
           python main.py build
 

@@ -32,7 +32,7 @@ flowchart TB
         E["Relevance score 0–10<br/>+ EM / DM / Transversal<br/>from title, source, abstract"]
         F["No abstract anywhere:<br/>labelled from title,<br/>not scored, not selectable"]
     end
-    subgraph U["3 · Publish (5th of each month)"]
+    subgraph U["3 · Write up (4th) and publish (5th of each month)"]
         direction LR
         G["Select 5–8 papers<br/>score ≥ 6 · at most 2 per source<br/>EM guard"]
         H["Write-ups, Gemini flash<br/>full text where open<br/>numbers checked against the text"]
@@ -47,8 +47,8 @@ flowchart TB
     H -.-> Q
 ```
 
-Everything runs on GitHub Actions with no server: screening twice a day, the
-issue on the 5th (each issue covers one calendar month), and a catch-up that
+Everything runs on GitHub Actions with no server: screening twice a day, write-ups
+drafted on the 4th, the issue on the 5th (each issue covers one calendar month), and a catch-up that
 remakes an issue that GitHub delayed or skipped. GitHub's free scheduler starts
 runs hours late (7–8 hours in the first week), so the design never relies on
 punctuality: runs are repeatable, and a late or skipped one is covered by the
@@ -88,8 +88,9 @@ next ([details](TECHNICAL.md#deployment-and-scheduling)).
   re-run whenever the prompt or the models change, every number in a write-up
   is checked against the paper's text, and each issue gets a health report in
   English, posted as a GitHub issue that GitHub emails to the owner ([details](TECHNICAL.md#keeping-llm-quality-up)).
-- **Runs itself**: GitHub Actions fetches and scores new papers twice a day and
-  publishes the issue on the 5th, with a catch-up that remakes an issue missed
+- **Runs itself**: GitHub Actions fetches and scores new papers twice a day,
+  drafts the write-ups on the 4th and publishes the issue on the morning of the
+  5th, with a catch-up that remakes an issue missed
   or delayed by GitHub, or written while the preferred model was overloaded.
 - **A calendar month per issue, nothing lost**: the October issue covers
   1–31 October and closes on 5 November, so papers indexed a few days late make

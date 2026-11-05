@@ -73,7 +73,8 @@ suite without network access or API keys.
 | When | Job | Steps |
 |---|---|---|
 | Every day, 05:23 and 17:47 UTC (see below on delays) | Daily screening | `fetch` (with abstract recovery) → `screen` → `catch-up` → `build` (refreshes the month in progress and its provisional picks) |
-| 5th of the month, 10:17 UTC (after the Gemini daily quota resets) | Monthly issue | `fetch` → `publish` (select from the month that just ended, write up, freeze the issue, build) |
+| 4th of the month (the daily runs) | Drafts | `draft`: write up the provisional picks of the month that just ended, ahead of publication |
+| 5th of the month, 00:17 UTC | Monthly issue | `fetch` → `publish` (confirm the selection, reuse the drafts, write up any newcomer, freeze the issue, build) |
 | On demand | Daily, monthly or republish | "Run workflow" button in the Actions tab; *republish* retries every missing abstract and rewrites last month's issue (`enrich --retry-all` → `publish --rewrite`), e.g. after a prompt change |
 
 Each run commits its database (`data/published.db`) and the built site
@@ -103,7 +104,7 @@ if the issue were made that day: the month in progress, and from the 1st to the
 **Scheduled runs start late.** GitHub's free scheduler does not run workflows
 on time. In the first week every scheduled run started 7 to 8 hours late
 (06:17 → 13:32, 05:23 → 13:41, 05:23 → 13:07 UTC), and on 5 November neither the
-05:23 nor the 10:17 run had started by 13:18. GitHub may also skip a run when
+05:23 nor the monthly 10:17 run (as it then was) had started by 13:18. GitHub may also skip a run when
 busy. The design does not depend on punctuality:
 
 - There are two daily runs (05:23 and 17:47 UTC), so one late or skipped run
@@ -114,6 +115,16 @@ busy. The design does not depend on punctuality:
 - The monthly issue has a safety net, below. On 5 November 2026 the issue was
   started by hand once the scheduled run was 3 hours late, to have it before the
   submission deadline; the safety net would otherwise have made it later that day.
+
+**Drafting the day before.** The newsletter is meant to go out on the morning
+of the 5th. So on the 4th, when the month is all but complete, the daily runs
+write up the month's provisional picks (summary, takeaways, why it matters,
+numbers checked) and the dashboard shows them marked as drafts. The issue run
+on the 5th, scheduled at 00:17 UTC so that it lands in the morning despite
+GitHub's delay, re-checks the selection with any paper that arrived on the 4th,
+reuses the drafts and writes up only newcomers. Spreading the write-ups over two
+days also halves the calls to the stronger model on any one day, whose free
+daily quota is small.
 
 A scheduler that keeps time (an external cron service calling the workflow's
 API) would fix the delay, at the cost of storing a GitHub token outside GitHub;

@@ -322,6 +322,25 @@ def month_pool(storage: Storage, month: str, rebuilding: bool = False) -> tuple[
     return pool, late
 
 
+def draft_month(storage: Storage, cfg: dict, now: datetime | None = None) -> str | None:
+    """The month whose write-ups should be drafted today, or None.
+
+    The day before the publish day (the 4th), the month that just ended is all but
+    complete, so its provisional picks are written up in advance. The issue on the
+    5th then only confirms the selection (papers that arrived on the 4th can still
+    enter) and writes up any newcomer, so it is ready early and needs few calls to
+    the stronger model on publish day."""
+    now = now or datetime.now(timezone.utc)
+    if now.day != publish_day(cfg) - 1:
+        return None
+    month = previous_month(month_of(now))
+    issue = storage.get_issue(month)
+    due = datetime.fromisoformat(f"{month_of(now)}-{publish_day(cfg):02d}T00:00:00+00:00")
+    if issue and datetime.fromisoformat(issue["published_at"]) >= due:
+        return None
+    return month
+
+
 def provisional_periods(storage: Storage, cfg: dict, now: datetime | None = None) -> list[dict]:
     """Months not yet published, newest first: the month in progress, and, until
     the publish day, the month that just ended and is still collecting late papers."""

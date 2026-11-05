@@ -161,6 +161,7 @@ def main() -> int:
     p_ev.add_argument("--rerun", action="store_true",
                       help="Re-classify the labelled papers now with the current prompt")
 
+    sub.add_parser("draft", help="Day before the publish day: write up last month's provisional picks in advance")
     sub.add_parser("catch-up", help="Daily safety net: (re)make last month's issue if the monthly run "
                                     "was missed, came early or used a fallback model")
 
@@ -249,6 +250,32 @@ def main() -> int:
 
     if args.command == "build":
         return build()
+
+    if args.command == "draft":
+        from src.analysis import draft_month, provisional
+        acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")
+        month = draft_month(storage, acfg)
+        if not month:
+            print("Draft: not the day before the publish day, nothing to do.")
+            return 0
+        preferred = acfg["llm"]["analysis_models"][0]
+        picks = provisional(storage, acfg, month=month)["paper_uids"]
+        if picks and all((storage.get_analysis(u) or {}).get("model") == preferred for u in picks):
+            print(f"Draft: the {month} picks are already written up by {preferred}.")
+            return 0
+        client = writer = None
+        try:
+            client, writer = make_client(acfg, "screening"), make_client(acfg, "analysis")
+            report = run_analysis(storage, client, acfg, analysis_client=writer, month=month,
+                                  fulltext_finder=make_finder(acfg, config["settings"]))
+        except (LLMError, ValueError) as exc:
+            print(f"ERROR: {exc}")
+            print_usage(*[c for c in (client, writer) if c])
+            return 1
+        print_basis(report["entries"])
+        print_usage(client, writer)
+        print(f"Draft: {len(report['entries'])} write-ups ready for the {month} issue (published tomorrow).")
+        return 0
 
     if args.command == "catch-up":
         acfg = load_analysis_config(ROOT / "config" / "analysis.yaml")

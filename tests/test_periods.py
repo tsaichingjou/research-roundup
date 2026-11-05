@@ -110,3 +110,27 @@ def test_catch_up_remakes_missing_early_or_fallback_issues(tmp_path):
     with s._conn() as c:
         c.execute("UPDATE analysis SET model='lite'")
     assert "fallback" in issue_needs_publishing(s, cfg, now=d("2026-11-06"))[1]
+
+
+def test_drafts_on_the_day_before_and_reused_on_publish_day(tmp_path):
+    from src.issues import publish_issue
+    cfg = {**CFG, "schedule": {"publish_day": 5}}
+    s = store_with(tmp_path, [("a", "Oct [DM] score=8", "2026-10-05"), ("b", "Oct EM [EM] score=7", "2026-10-20")])
+    assert analysis.draft_month(s, cfg, now=d("2026-11-03")) is None
+    assert analysis.draft_month(s, cfg, now=d("2026-11-04")) == "2026-10"
+
+    class Writer(FakeClient):
+        model = "strong"
+        candidates = ["strong", "lite"]
+    w1 = Writer()
+    analysis.run_analysis(s, FakeClient(), cfg, now=d("2026-11-04"), analysis_client=w1, month="2026-10")
+    drafted = sum("Title:" in p for p in w1.prompts)
+    assert drafted == 2 and s.get_issue("2026-10") is None              # drafted, not published
+    # a paper that arrives on the 4th enters the selection on the 5th; only it is written up
+    s.save_papers([Paper(source_id="c", source_name="c", title="Late [DM] score=9", url="https://x.org/c",
+                         abstract=ABSTRACT, published=d("2026-10-30"))])
+    w2 = Writer()
+    publish_issue(s, analysis.run_analysis(s, FakeClient(), cfg, now=d("2026-11-05"), analysis_client=w2))
+    assert sum("Title:" in p for p in w2.prompts) == 1
+    assert len(s.get_issue("2026-10")["paper_uids"]) == 3
+    assert analysis.draft_month(s, cfg, now=d("2026-12-04")) == "2026-11"

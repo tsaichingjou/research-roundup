@@ -183,7 +183,8 @@
   .method p, .method li { max-width: 72ch; }
   .method ul { padding-left: 20px; }
   .method li { margin: 6px 0; }
-  .timeline { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .timeline { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 1000px) { .timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .timeline li { background: var(--mist); border-radius: var(--radius); padding: 14px 16px; margin: 0; max-width: none; }
   .timeline b { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--brand); margin-bottom: 4px; }
   table.rubric { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 14px; }
@@ -478,13 +479,16 @@
     const pp = provisionalOf[p.uid];
     const prov = pp && !a
       ? `<p class="pending-note"><strong>Provisional pick.</strong> On today's scores this paper would be in the ${esc(pp.title)} issue.
-         Its summary, key takeaways and "why it matters" are written when the issue is published on ${longDate(pp.publish_on)}.</p>` : "";
+         Its summary, key takeaways and "why it matters" are drafted the day before the issue is published on ${longDate(pp.publish_on)}.</p>`
+      : pp && p.draft
+      ? `<p class="pending-note"><strong>Draft.</strong> Written ahead of the ${esc(pp.title)} issue, published on ${longDate(pp.publish_on)}.
+         The selection can still change until then.</p>` : "";
     d.innerHTML = `
       <button type="button" class="close" id="close">Close</button>
       ${p.focus ? `<span class="tag" style="color:${color};background:${TINT[p.focus]}">${esc(focusLabel(p.focus))}</span>` : ""}
       <h3><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a></h3>
       <p class="meta">${esc(p.authors.slice(0, 8).join(", "))}${p.authors.length > 8 ? " and others" : ""}</p>
-      ${a ? `
+      ${a ? `${prov}
         <h4>Summary</h4><p>${esc(a.summary)}</p>
         <h4>Key takeaways</h4><ul>${a.key_takeaways.map(t => `<li>${esc(t)}</li>`).join("")}</ul>
         <h4>Why it matters</h4><p>${esc(a.relevance)}</p>
@@ -579,6 +583,7 @@
       <ol class="timeline">
         <li><b>Every day</b>New publications are collected from all sources, missing abstracts are looked up, and each new paper is scored. The dashboard is refreshed twice a day, usually in the afternoon and evening (UK time).</li>
         <li><b>During the month</b>The dashboard shows the month in progress, and until the ${ordinal(PUBLISH_DAY)} the month just ended, with a <em>provisional</em> selection: the papers that would be chosen if the issue were made that day.</li>
+        <li><b>The day before</b>The provisional picks of the month that just ended are written up in advance, so the issue is ready early.</li>
         <li><b>On the ${ordinal(PUBLISH_DAY)} of the next month</b>The month is closed: the final ${sel.min_papers}–${sel.max_papers} papers are chosen, written up and published as the issue.</li>
       </ol>
 
