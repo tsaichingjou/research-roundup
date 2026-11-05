@@ -15,6 +15,18 @@ classification with its rationale.
 
 Full design notes, source by source, are in **[TECHNICAL.md](TECHNICAL.md)**.
 
+**Deliverables at a glance**
+
+| The brief asks for | Where it is |
+|---|---|
+| Fully automated Python application | `main.py` and `src/`, run by GitHub Actions (`.github/workflows/pipeline.yml`): daily screening, monthly issue, catch-up |
+| Responsive, email-ready HTML newsletter, published monthly | [`issues/2026-10.html`](https://tsaichingjou.github.io/research-roundup/issues/2026-10.html) (source in `templates/newsletter.html.j2`) |
+| Supporting documentation | This README and [TECHNICAL.md](TECHNICAL.md) |
+| Source configuration | `config/sources.yaml` (journals, NBER, IMF, BIS, Feds) and `config/institutions.yaml` (central banks) |
+| Data pipeline | `src/fetchers/`, `src/pipeline.py`, `src/enrich.py`, `src/storage.py` |
+| Analysis module | `src/analysis.py` and `src/prompts.py` (scoring, EM / DM / Transversal, selection, write-ups) |
+| Sample output demonstrating quality and reliability | The October 2026 issue (also in the repository at `docs/issues/2026-10.html`), its [quality report](https://github.com/tsaichingjou/research-roundup/issues/1), the classification check in `evaluation/report.txt`, and 87 automated tests |
+
 ## How it works
 
 ```mermaid
