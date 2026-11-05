@@ -442,7 +442,8 @@ run builds `docs/` and deploys it to GitHub Pages):
   coloured by market focus, then gives every paper a plain-language summary,
   three takeaways, why it matters and the classification rationale. A closing
   "How this issue was made" section states what was screened, which sources
-  could not be assessed and why, and which model wrote the summaries.
+  needed a fallback for missing abstracts (a per-source table), and which
+  model wrote the summaries.
 - **`index.html` — the explorer**, in three views that all follow one period
   selector (a published issue, the month in progress, or all papers):
   - *Papers*: the issue's chosen papers (or, for the month in progress, the
@@ -474,8 +475,8 @@ Research: a deep-green header and a "Prepared for…" line set in plain text.
 No logo or official branding is used, and every page states that it is a
 candidate assessment, not an official publication (`config/site.yaml`).
 
-Issues are frozen when published: re-running `publish` in the same month
-replaces that month's issue, but earlier issues are never changed.
+Issues are frozen when published: remaking an issue (by the catch-up or a
+republish) replaces that issue only; other months' issues are never changed.
 
 ## Evaluating the classification
 
