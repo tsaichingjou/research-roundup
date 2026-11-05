@@ -577,7 +577,7 @@
       OpenAlex index) a few days after their publication date: the wait lets them into their own month. A paper that appears
       even later is not lost: it joins the next issue as a <em>late arrival</em>.</p>
       <ol class="timeline">
-        <li><b>Every day</b>New publications are collected from all sources, missing abstracts are looked up, and each new paper is scored.</li>
+        <li><b>Every day</b>New publications are collected from all sources, missing abstracts are looked up, and each new paper is scored. The dashboard is refreshed twice a day, usually in the afternoon and evening (UK time).</li>
         <li><b>During the month</b>The dashboard shows the month in progress, and until the ${ordinal(PUBLISH_DAY)} the month just ended, with a <em>provisional</em> selection: the papers that would be chosen if the issue were made that day.</li>
         <li><b>On the ${ordinal(PUBLISH_DAY)} of the next month</b>The month is closed: the final ${sel.min_papers}–${sel.max_papers} papers are chosen, written up and published as the issue.</li>
       </ol>
@@ -673,7 +673,7 @@
     renderDetail();
   }
 
-  $("footer").innerHTML = `Data updated ${fmtDate(DATA.generated_at)}. ${DATA.papers.length} publications in the database from ${new Set(DATA.papers.map(p => p.source)).size} sources.
+  $("footer").innerHTML = `Data updated ${fmtDate(DATA.generated_at)}, ${new Date(DATA.generated_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })} UK time; refreshed twice a day. ${DATA.papers.length} publications in the database from ${new Set(DATA.papers.map(p => p.source)).size} sources.
     Summaries and classifications are produced by a language model and may contain errors. <a href="#method">How it works</a> · <a href="data/site.json">Download the data (JSON)</a>.
     ${DISCLAIMER ? `<br>${esc(DISCLAIMER)}` : ""}`;
   document.addEventListener("keydown", e => { if (e.key === "Escape" && $("detail").classList.contains("open") && window.innerWidth <= 900) { state.selected = null; render(); } });

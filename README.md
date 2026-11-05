@@ -47,9 +47,12 @@ flowchart TB
     H -.-> Q
 ```
 
-Everything runs on GitHub Actions with no server: screening every day, the
+Everything runs on GitHub Actions with no server: screening twice a day, the
 issue on the 5th (each issue covers one calendar month), and a catch-up that
-remakes an issue that GitHub delayed or skipped.
+remakes an issue that GitHub delayed or skipped. GitHub's free scheduler starts
+runs hours late (7–8 hours in the first week), so the design never relies on
+punctuality: runs are repeatable, and a late or skipped one is covered by the
+next ([details](TECHNICAL.md#deployment-and-scheduling)).
 
 ## Highlights
 
@@ -85,7 +88,7 @@ remakes an issue that GitHub delayed or skipped.
   re-run whenever the prompt or the models change, every number in a write-up
   is checked against the paper's text, and each issue gets a health report in
   English, posted as a GitHub issue that GitHub emails to the owner ([details](TECHNICAL.md#keeping-llm-quality-up)).
-- **Runs itself**: GitHub Actions fetches and scores new papers every day and
+- **Runs itself**: GitHub Actions fetches and scores new papers twice a day and
   publishes the issue on the 5th, with a catch-up that remakes an issue missed
   or delayed by GitHub, or written while the preferred model was overloaded.
 - **A calendar month per issue, nothing lost**: the October issue covers

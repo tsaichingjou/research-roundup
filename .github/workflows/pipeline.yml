@@ -14,6 +14,9 @@ name: Research Roundup pipeline
 on:
   schedule:
     - cron: "23 5 * * *"     # daily screening
+    - cron: "47 17 * * *"    # second daily run, as a backup: GitHub has started scheduled runs
+                             # 7-8 hours late and may skip one; reruns are safe (nothing is
+                             # fetched, scored or published twice)
     - cron: "17 10 5 * *"    # monthly issue (5th: lets late-indexed papers into their month;
                              # 10:17 UTC: after the Gemini free-tier daily quota resets at 08:00 UTC)
   workflow_dispatch:

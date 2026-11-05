@@ -72,7 +72,7 @@ suite without network access or API keys.
 
 | When | Job | Steps |
 |---|---|---|
-| Every day, 05:23 UTC | Daily screening | `fetch` (with abstract recovery) → `screen` → `catch-up` → `build` (refreshes the month in progress and its provisional picks) |
+| Every day, 05:23 and 17:47 UTC (see below on delays) | Daily screening | `fetch` (with abstract recovery) → `screen` → `catch-up` → `build` (refreshes the month in progress and its provisional picks) |
 | 5th of the month, 10:17 UTC (after the Gemini daily quota resets) | Monthly issue | `fetch` → `publish` (select from the month that just ended, write up, freeze the issue, build) |
 | On demand | Daily, monthly or republish | "Run workflow" button in the Actions tab; *republish* retries every missing abstract and rewrites last month's issue (`enrich --retry-all` → `publish --rewrite`), e.g. after a prompt change |
 
@@ -100,10 +100,27 @@ shows the month with a provisional selection, the papers that would be chosen
 if the issue were made that day: the month in progress, and from the 1st to the
 5th also the month that is closing.
 
-**Safety net for the monthly run.** GitHub runs scheduled workflows late when
-its servers are busy (a run set for 05:23 has started at 13:07) and may skip
-one, and on the publish day Gemini's larger models can be overloaded. So every
-daily run also calls `catch-up`: from the 5th to the 8th it (re)makes last
+**Scheduled runs start late.** GitHub's free scheduler does not run workflows
+on time. In the first week every scheduled run started 7 to 8 hours late
+(06:17 → 13:32, 05:23 → 13:41, 05:23 → 13:07 UTC), and on 5 November neither the
+05:23 nor the 10:17 run had started by 13:18. GitHub may also skip a run when
+busy. The design does not depend on punctuality:
+
+- There are two daily runs (05:23 and 17:47 UTC), so one late or skipped run
+  is covered by the other; in practice the dashboard is refreshed in the
+  afternoon and evening, UK time.
+- Every step is safe to repeat: papers are de-duplicated, scored once, and an
+  issue that is already right is left alone.
+- The monthly issue has a safety net, below. On 5 November 2026 the issue was
+  started by hand once the scheduled run was 3 hours late, to have it before the
+  submission deadline; the safety net would otherwise have made it later that day.
+
+A scheduler that keeps time (an external cron service calling the workflow's
+API) would fix the delay, at the cost of storing a GitHub token outside GitHub;
+for a monthly newsletter the delay does not matter, so it was not added.
+
+**Safety net for the monthly run.** On the publish day Gemini's larger models
+can also be overloaded. So every daily run also calls `catch-up`: from the 5th to the 8th it (re)makes last
 month's issue if it is missing, was made before the 5th, or contains write-ups
 by a fallback model. The issue is therefore complete within a few days without
 anyone pressing a button.
