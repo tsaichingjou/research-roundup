@@ -499,6 +499,17 @@ Transversal (e.g. a US-tariff trade-diversion paper about the EU), the boundary
 that the definitions leave most open to judgement. Relevance scores were within
 one point for 87% of papers.
 
+*Reading the numbers.* Two models guessing at random among three labels
+would still agree about a third of the time, so raw agreement flatters.
+Cohen's κ removes that chance agreement: κ = (observed agreement − chance
+agreement) / (1 − chance agreement), here (0.962 − 0.33) / (1 − 0.33) ≈ 0.94.
+On the usual scale, 0 is no better than chance, 0.6–0.8 is substantial and
+above 0.8 is almost perfect agreement. "EM 35/35" means that every one of the
+35 papers the screening model labelled EM was also labelled EM by the second
+model. That matters because EM is both the smallest class (about 10% of
+papers) and the one most easily confused, as many EM papers are about the
+effect of US or euro-area policy on emerging economies.
+
 Agreement is not accuracy: two models can make the same mistake, and models
 from one family may share a bias. What it does show is how stable the labels
 are and which classes get confused, and it narrows human review to where it
