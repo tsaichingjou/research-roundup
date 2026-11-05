@@ -435,7 +435,9 @@ full text, and is instructed not to state findings that are not in them.
 `python main.py publish` builds the site (into `site/` locally; the scheduled
 run builds `docs/` and deploys it to GitHub Pages):
 
-- **`issues/YYYY-MM.html` — the newsletter.** Built for email as well as the web:
+- **`issues/YYYY-MM.html` — the newsletter.** An issue bar at the top links the latest six issues, newest first, and the
+  dashboard, so readers can move between months from the newsletter itself (plain
+  absolute links, which work in email clients too). Built for email as well as the web:
   table layout and inline styles (Outlook, Gmail and Apple Mail ignore most modern
   CSS), web-safe fonts, a 640px column that narrows on phones. Each issue opens
   with an editor's note and a composition strip, one segment per featured paper

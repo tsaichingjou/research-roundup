@@ -29,6 +29,12 @@
 
   {# ---- Masthead ---- #}
   <tr><td height="6" bgcolor="{{ brand }}" style="height:6px; background:{{ brand }}; font-size:0; line-height:0;">&nbsp;</td></tr>
+  {# Issue bar: the latest issues, newest first; plain links so it works in email too #}
+  <tr><td class="px" bgcolor="#f3f6f5" style="padding:10px 40px; background:#f3f6f5; border-bottom:1px solid {{ rule }}; font-family:{{ sans }}; font-size:13px; line-height:1.9; color:{{ muted }};">
+    <span style="font-weight:bold; letter-spacing:0.04em; text-transform:uppercase; font-size:11px; color:{{ brand }}; padding-right:8px;">Issues</span>
+    {% for n in nav_issues %}{% if n.current %}<span style="display:inline-block; padding:1px 9px; margin:0 2px; border-radius:12px; background:{{ brand }}; color:#ffffff; font-weight:bold;">{{ n.label }}</span>{% else %}<a href="{{ n.url }}" style="display:inline-block; padding:1px 9px; margin:0 2px; color:#2c5bb8; text-decoration:none;">{{ n.label }}</a>{% endif %}{% endfor %}
+    {% if site.site_url %}<a href="{{ site.site_url }}" style="display:inline-block; padding:1px 0 1px 8px; color:#2c5bb8; text-decoration:underline;">All issues and papers&nbsp;&rarr;</a>{% endif %}
+  </td></tr>
   <tr><td class="px" style="padding:30px 40px 8px 40px;">
     {% if site.prepared_for %}<p style="margin:0 0 10px 0; font-family:{{ sans }}; font-size:13px; line-height:1.4; color:{{ brand }};">Prepared for {{ site.prepared_for }}</p>{% endif %}
     <p class="masthead" style="margin:0; font-family:{{ serif }}; font-size:32px; line-height:1.15; color:{{ ink }};">{{ site.title }}</p>

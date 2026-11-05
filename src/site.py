@@ -132,6 +132,21 @@ def fallback_markdown(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def issue_nav(data: dict, issue: dict, site: dict, limit: int = 6) -> list[dict]:
+    """Links to the most recent issues, newest first, for the bar at the top of each
+    newsletter. Absolute URLs, so they also work in an email."""
+    base = (site.get("site_url") or "").rstrip("/")
+    ids = sorted({i["id"] for i in data["issues"]} | {issue["id"]}, reverse=True)
+    if issue["id"] in ids[limit:]:          # an old issue keeps its own entry in the bar
+        ids = ids[:limit - 1] + [issue["id"]]
+    out = []
+    for i in ids[:limit]:
+        dt = datetime.fromisoformat(f"{i}-01")
+        out.append({"id": i, "label": dt.strftime("%b %Y"), "current": i == issue["id"],
+                    "url": f"{base}/issues/{i}.html" if base else f"{i}.html"})
+    return out
+
+
 def issue_context(data: dict, issue: dict, site: dict) -> dict:
     by_uid = {p["uid"]: p for p in data["papers"]}
     entries = [by_uid[u] for u in issue["paper_uids"] if u in by_uid and by_uid[u]["analysis"]]
@@ -166,6 +181,7 @@ def issue_context(data: dict, issue: dict, site: dict) -> dict:
         "n_late": len(issue["stats"].get("late_uids") or []),
         "fmt_date": _date,
         "fallbacks": fallbacks, "fallback_columns": FALLBACK_COLUMNS,
+        "nav_issues": issue_nav(data, issue, site),
     }
 
 

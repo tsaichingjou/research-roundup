@@ -73,3 +73,14 @@ def test_editor_note_uses_llm_and_falls_back(built):
 
     assert publish_issue(store, report, client=NoteClient())["intro"] == "A focused note."
     assert "This issue features" in publish_issue(store, report, client=None)["intro"]
+
+
+def test_issue_bar_links_recent_issues_newest_first():
+    from src.site import issue_nav
+    data = {"issues": [{"id": f"2026-{m:02d}"} for m in range(1, 13)]}
+    site = {"site_url": "https://x.io/rr/"}
+    nav = issue_nav(data, {"id": "2026-12"}, site)
+    assert [n["id"] for n in nav] == ["2026-12", "2026-11", "2026-10", "2026-09", "2026-08", "2026-07"]
+    assert nav[0]["current"] and nav[1]["url"] == "https://x.io/rr/issues/2026-11.html"
+    old = issue_nav(data, {"id": "2026-02"}, site)          # an old issue still shows itself
+    assert old[-1]["id"] == "2026-02" and old[-1]["current"] and len(old) == 6
