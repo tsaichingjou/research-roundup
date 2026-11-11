@@ -150,7 +150,7 @@
       </tr>
       {% endfor %}
     </table>
-    <p style="margin:0 0 10px 0;">OpenAlex, publisher page and paper's own text: an abstract (or, for speeches and short articles, the opening paragraphs) was recovered and the paper was scored as usual. Title only: nothing was found anywhere (JPE publishes no open abstracts), so the paper was labelled by market focus from its title, not scored, and left out of the selection for this issue.</p>
+    <p style="margin:0 0 10px 0;">OpenAlex, publisher page and paper's own text: an abstract (or, for speeches and short articles, the opening paragraphs) was recovered and the paper was scored as usual. Title only: nothing was found anywhere (JPE shows abstracts only on a website that blocks automated access), so the paper was labelled by market focus from its title, not scored, and left out of the selection for this issue.</p>
     {% endif %}
     {% if n_title_only and not fallbacks %}
     <p style="margin:0 0 10px 0;">{{ n_title_only }} publication{{ " with no abstract anywhere was" if n_title_only == 1 else "s with no abstract anywhere were" }} labelled by market focus from {{ "its title" if n_title_only == 1 else "their titles" }} only{% if title_only_sources %} ({{ title_only_sources }}){% endif %}. A title is too little to rank on, so {{ "it was" if n_title_only == 1 else "they were" }} not eligible for this issue.</p>

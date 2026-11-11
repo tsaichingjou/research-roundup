@@ -536,7 +536,7 @@
     $("cov-sub").textContent = (per
         ? `${pool.length} publications from ${rows.length} sources, by market focus: everything published ${fmtDate(per.window_start)} to ${per.status === "in_progress" ? fmtDate(per.window_end) : lastDay(per.window_end)}${per.late_uids && per.late_uids.length ? `, plus ${per.late_uids.length} late arrivals from the month before` : ""}.`
         : `${pool.length} publications from ${rows.length} sources in the database, by market focus.`)
-      + (nTitle ? ` ${nTitle} with no abstract anywhere (mostly JPE, which publishes none openly) are labelled from their title and counted here, but are not scored.` : "")
+      + (nTitle ? ` ${nTitle} with no abstract anywhere (mostly JPE, whose website blocks automated access) are labelled from their title and counted here, but are not scored.` : "")
       + (N_NONPAPER && !per ? ` ${N_NONPAPER} non-research items (data deposits, editorial notices) are left out.` : "")
       + " Change the period with the selector at the top.";
     const anyNa = rows.some(r => r.na);
@@ -617,7 +617,7 @@
 
       <h3>Papers without an abstract</h3>
       <p>When a source gives no abstract, the agent looks for one in OpenAlex, on the publisher's page, and at the start of the
-      paper's own text. Where none exists anywhere (mostly the Journal of Political Economy, which publishes no open abstracts,
+      paper's own text. Where none exists anywhere (mostly the Journal of Political Economy, whose abstracts are only on a website that blocks automated access,
       and some short Fed speeches and blog posts), the market focus is labelled from the title alone. These papers appear in the
       lists and the coverage chart marked <em>Labelled from title</em>, but are not scored and cannot be chosen: a title is too
       little to rank on. Data deposits and editorial notices are left out as not research.</p>

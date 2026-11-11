@@ -8,6 +8,11 @@ from tests.test_analysis import ABSTRACT, CFG
 CFG2 = {**CFG, "schedule": {"publish_day": 5}, "llm": {"analysis_models": ["strong", "lite"]}}
 
 
+def keys(alerts):
+    """Alert keys, leaving out the date-dependent issue check (tested on its own below)."""
+    return [a["key"] for a in alerts if a["key"] != "issue"]
+
+
 def d(s):
     return datetime.fromisoformat(s + "T12:00:00+00:00")
 
@@ -24,11 +29,11 @@ def test_unscored_papers_alert_only_after_two_days(tmp_path, monkeypatch):
     s.save_papers([Paper(source_id="a", source_name="A", title="T", url="https://x/1", abstract=ABSTRACT,
                          published=d("2026-11-01"))])
     now = datetime.now(timezone.utc)
-    assert health.check(s, CFG2, now=now) == []                       # just collected
+    assert keys(health.check(s, CFG2, now=now)) == []                 # just collected
     with s._conn() as c:
         c.execute("UPDATE papers SET fetched_at='2000-01-01T00:00:00+00:00'")
         c.execute("UPDATE papers SET published=?", (now.strftime("%Y-%m-%d"),))
-    assert [a["key"] for a in health.check(s, CFG2, now=now)] == ["unscored"]
+    assert keys(health.check(s, CFG2, now=now)) == ["unscored"]
 
 
 def test_source_failing_three_runs_and_auth_marker(tmp_path, monkeypatch):
@@ -39,7 +44,7 @@ def test_source_failing_three_runs_and_auth_marker(tmp_path, monkeypatch):
     s.log_fetch("nber", "error", message="timeout")
     s.log_fetch("nber", "ok", 5, 1)
     now = datetime.now(timezone.utc)
-    alerts = {a["key"]: a for a in health.check(s, CFG2, now=now)}
+    alerts = {a["key"]: a for a in health.check(s, CFG2, now=now) if a["key"] != "issue"}
     assert set(alerts) == {"sources"} and "fed_x" in alerts["sources"]["body"] and "nber" not in alerts["sources"]["body"]
     health.AUTH_MARKER.write_text("API key not valid")
     assert "auth" in {a["key"] for a in health.check(s, CFG2, now=now)}

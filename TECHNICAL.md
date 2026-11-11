@@ -191,7 +191,7 @@ python -m pytest -q                  # run tests (no network or API key needed)
 | Required in the brief | How it is covered | Channel |
 |---|---|---|
 | AER, Econometrica, QJE, REStud | One source per journal | Crossref API by ISSN (90-day look-back, as journals register DOIs in batches) |
-| JPE | **Partial**: only papers whose abstract can be recovered (about 40% in testing); see below | Crossref API by ISSN + OpenAlex for abstracts |
+| JPE | **Partial**: only papers whose abstract can be recovered (about a quarter so far); see below | Crossref API by ISSN + OpenAlex for abstracts |
 | NBER | All new working papers | NBER RSS |
 | BPEA | **None so far**: spring and autumn editions, but see below | OpenAlex API by ISSN (1-year look-back; no feed exists, and Crossref returned nothing) |
 | IMF | IMF Working Papers | Crossref API by ISSN (the IMF RSS endpoint returns 404) |

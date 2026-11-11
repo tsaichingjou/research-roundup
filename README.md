@@ -107,7 +107,8 @@ next ([details](TECHNICAL.md#deployment-and-scheduling)).
 - **A calendar month per issue, nothing lost**: the October issue covers
   1–31 October and closes on 5 November, so papers indexed a few days late make
   their own month; anything later joins the next issue as a late arrival.
-- **Honest about gaps**: JPE is only partly covered (no open abstracts) and BPEA
+- **Honest about gaps**: JPE is only partly covered (its site blocks automated access and its
+  Crossref records carry no abstracts) and BPEA
   has returned no papers so far; both are documented in the
   [technical notes](TECHNICAL.md#source-coverage), as are the limits of the
   agreement check.
@@ -143,7 +144,7 @@ own. Schedules, run modes and every command are in
 ## Key design decisions
 
 - **Documented APIs and feeds, not scraping**, so the agent keeps working when
-  sites change; the price is two gaps, JPE (no open abstracts) and BPEA (not
+  sites change; the price is two gaps, JPE (abstracts only on a site that blocks automated access) and BPEA (not
   yet in OpenAlex), both [documented](TECHNICAL.md#source-coverage).
 - **A cheap model for every paper, a stronger one for the few that matter**:
   scoring ~700 papers a month and writing 5–8 careful summaries stays within
